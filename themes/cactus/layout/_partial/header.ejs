@@ -27,6 +27,18 @@
       <% for (var i in theme.nav) { %><!--
      --><li><a href="<%- url_for(theme.nav[i]) %>"><%= __('nav.'+i).replace("nav.", "") %></a></li><!--
    --><% } %>
+<li>
+  <div class="theme-switcher-wrapper">
+    <i class="fa fa-palette"></i>
+    <select id="theme-select" onchange="setTheme(this.value)">
+      <option value="white">White</option>
+      <option value="classic">Classic</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <i class="fa fa-caret-down arrow"></i>
+  </div>
+</li>
     </ul>
   </div>
 </header>

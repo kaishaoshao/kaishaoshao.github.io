@@ -1,0 +1,139 @@
+// source/css/theme-switcher.styl
+
+// 1. 定义映射函数：把 Cactus 的变量转为 CSS 变量
+inject-cactus-vars()
+  --color-background: $color-background
+  --color-footer-mobile-1: $color-footer-mobile-1
+  --color-footer-mobile-2: $color-footer-mobile-2
+  --color-background-code: $color-background-code
+  --color-border: $color-border
+  --color-scrollbar: $color-scrollbar
+  --color-meta: $color-meta
+  --color-meta-code: $color-meta-code
+  --color-link: $color-link
+  --color-text: $color-text
+  --color-accent-1: $color-accent-1
+  --color-accent-2: $color-accent-2
+  --color-accent-3: $color-accent-3
+  --color-quote: $color-quote
+
+// 2. 分别导入并应用
+// 注意：下面的路径假设你的博客根目录有 themes/cactus 文件夹
+// 如果报错，请看代码下方的“路径修复指南”
+
+[data-theme="white"]
+  @import "./_colors/white"
+  inject-cactus-vars()
+
+[data-theme="classic"]
+  @import "./_colors/classic"
+  inject-cactus-vars()
+
+[data-theme="dark"]
+  @import "./_colors/dark"
+  inject-cactus-vars()
+  // Dark 模式下的特殊修正
+  --color-background-code: #282a36
+  --color-text-code: #c9cacc
+
+[data-theme="light"]
+  @import "./_colors/light"
+  inject-cactus-vars()
+
+// 3. 强力覆盖样式
+:root
+  --transition-speed: 0.3s
+
+// 全局背景和文字
+body
+#header
+#footer
+.content
+  background-color: var(--color-background) !important
+  color: var(--color-text) !important
+  transition: background-color var(--transition-speed), color var(--transition-speed)
+
+// 链接
+a
+  color: var(--color-link) !important
+
+// 标题
+h1, h2, h3, h4, h5, h6
+.post-title
+  color: var(--color-text) !important
+
+// 文章正文段落
+p
+li
+  color: var(--color-text) !important
+
+// 元信息（日期等）
+.meta
+.post-meta
+  color: var(--color-meta) !important
+
+// 代码块 (背景色和文字色)
+figure.highlight
+pre
+code
+  background: var(--color-background-code) !important
+  color: var(--color-text) !important
+
+// 引用块
+blockquote
+  border-left: 4px solid var(--color-quote) !important
+  color: var(--color-meta) !important
+  background: transparent !important
+.theme-switcher-wrapper
+  display: inline-flex
+  align-items: center
+  position: relative
+  margin-left: 10px
+  padding: 2px 8px
+  border: 1px solid var(--color-border) // 给个细边框
+  border-radius: 4px                    // 圆角
+  transition: all 0.3s
+
+  // 鼠标悬停时边框变色
+  &:hover
+    border-color: var(--color-link)
+
+  // 左侧调色盘图标
+  .fa-palette
+    font-size: 12px
+    margin-right: 5px
+    color: var(--color-meta)
+
+  // 右侧小箭头
+  .arrow
+    font-size: 10px
+    margin-left: 5px
+    color: var(--color-meta)
+    pointer-events: none // 让点击穿透箭头直接触发 select
+
+  // 核心：改造 select 元素
+  select
+    appearance: none        // 隐藏浏览器默认样式 (Chrome/Safari)
+    -moz-appearance: none   // Firefox
+    -webkit-appearance: none
+    background: transparent
+    border: none
+    outline: none
+    color: var(--color-text)
+    font-family: inherit
+    font-size: inherit
+    cursor: pointer
+    padding: 0
+    margin: 0
+    width: auto
+    text-align: center
+
+    // 解决 Firefox 里的文字对齐问题
+    &:-moz-focusring
+      color: transparent
+      text-shadow: 0 0 0 var(--color-text)
+
+    // 下拉选项的背景色 (防止在 Dark 模式下出现白底黑字)
+    option
+      background-color: var(--color-background)
+      color: var(--color-text)

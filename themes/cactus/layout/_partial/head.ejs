@@ -78,3 +78,14 @@
 		<script src='https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-MML-AM_CHTML' async></script>
 	<% } %>
 </head>
+
+<link rel="stylesheet" href="/css/theme-switcher.css">
+
+<script>
+  (function () {
+    const savedTheme = localStorage.getItem('theme') || 'white';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  })();
+</script>
+
+<script src="/js/theme-switcher.js" defer></script>

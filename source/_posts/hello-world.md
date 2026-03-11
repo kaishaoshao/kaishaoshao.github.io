@@ -7,7 +7,7 @@ Welcome to [Hexo](https://hexo.io/)! This is your very first post. Check [docume
 
 ### Create a new post
 
-``` bash
+```bash
 $ hexo new "My New Post"
 ```
 
@@ -15,24 +15,37 @@ More info: [Writing](https://hexo.io/docs/writing.html)
 
 ### Run server
 
-``` bash
-$ hexo server
+```bash
+$ hexo server # hexo s
 ```
 
 More info: [Server](https://hexo.io/docs/server.html)
 
 ### Generate static files
 
-``` bash
-$ hexo generate
+```bash
+$ hexo generate # hexo g
 ```
 
 More info: [Generating](https://hexo.io/docs/generating.html)
 
 ### Deploy to remote sites
 
-``` bash
-$ hexo deploy
+```bash
+$ hexo deploy # hexo d
 ```
 
 More info: [Deployment](https://hexo.io/docs/one-command-deployment.html)
+
+### Clean
+
+``````bash
+$ hexo clean  
+``````
+
+### Combination Techniques
+
+```bash
+$ hexo clean && hexo g && hexo d
+```
+

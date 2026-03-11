@@ -1,21 +1,30 @@
-// source/js/theme-switcher.js
+// 定义主题顺序
+const themes = ['white', 'classic', 'dark', 'light'];
 
-// 1. 设置指定主题
-function setTheme(themeName) {
-    // 设置 HTML 属性，触发 CSS 变化
-    document.documentElement.setAttribute('data-theme', themeName);
-    // 保存到本地存储
-    localStorage.setItem('theme', themeName);
-}
+// 切换逻辑
+window.toggleTheme = function() {
+    // 1. 获取当前主题 (从 localStorage 获取，如果没有则说明是默认状态)
+    // 注意：这里的默认值应与你 _config.yml 里的 colorscheme 一致
+    const currentTheme = localStorage.getItem('theme') || 'classic';
 
-// 2. 初始化下拉菜单的状态 (让菜单显示当前选中的颜色)
-function initThemeSelect() {
-    const savedTheme = localStorage.getItem('theme') || 'white';
-    const selectElement = document.getElementById('theme-select');
-    if (selectElement) {
-        selectElement.value = savedTheme;
+    // 2. 计算下一个主题
+    const currentIndex = themes.indexOf(currentTheme);
+    const nextIndex = (currentIndex + 1) % themes.length;
+    const nextTheme = themes[nextIndex];
+
+    // 3. 设置 HTML 属性 (触发 CSS 变量变化)
+    document.documentElement.setAttribute('data-theme', nextTheme);
+
+    // 4. 保存到本地存储
+    localStorage.setItem('theme', nextTheme);
+    
+    console.log('Theme switched to:', nextTheme);
+};
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
     }
-}
-
-// 页面加载完成后，同步菜单状态
-document.addEventListener('DOMContentLoaded', initThemeSelect);
+});

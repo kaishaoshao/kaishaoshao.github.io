@@ -79,11 +79,9 @@
 	<% } %>
 </head>
 
-<link rel="stylesheet" href="/css/theme-switcher.css">
-
 <script>
   (function () {
-    const savedTheme = localStorage.getItem('theme') || 'white';
+    const savedTheme = localStorage.getItem('theme') || 'classic';
     document.documentElement.setAttribute('data-theme', savedTheme);
   })();
 </script>

@@ -233,3 +233,91 @@ code
 
 #header-post #actions
   direction: ltr !important
+
+// --- 主题切换逻辑 (Theme Switcher) ---
+
+:root
+  // 默认值 (Classic)
+  --color-background: #fafafa
+  --color-text: #22272a
+  --color-link: rgba(86, 124, 119, .4)
+  --color-accent-1: #cc2a41
+  --color-background-code: #f5f5f5
+  --color-meta: #666
+  --color-quote: #cc2a41
+
+[data-theme="white"]
+  --color-background: #FFFFFF
+  --color-text: #383838
+  --color-link: rgba(212, 128, 170, 1)
+  --color-accent-1: #2bbc8a
+  --color-background-code: #fdfdfd
+  --color-meta: #666
+  --color-quote: #2bbc8a
+
+[data-theme="classic"]
+  --color-background: #fafafa
+  --color-text: #22272a
+  --color-link: rgba(86, 124, 119, .4)
+  --color-accent-1: #cc2a41
+  --color-background-code: #f5f5f5
+  --color-meta: #666
+  --color-quote: #cc2a41
+
+[data-theme="dark"]
+  --color-background: #1d1f21
+  --color-text: #c9cacc
+  --color-link: rgba(212, 128, 170, 1)
+  --color-accent-1: #2bbc8a
+  --color-background-code: #282a36
+  --color-meta: #908d8d
+  --color-quote: #ccffb6
+
+[data-theme="light"]
+  --color-background: #e2e0de
+  --color-text: #363533
+  --color-link: rgba(43, 188, 138, 1)
+  --color-accent-1: #d44375
+  --color-background-code: #dad8d6
+  --color-meta: #666
+  --color-quote: #ab2251
+
+// 应用变量覆盖 (仅在 [data-theme] 存在时强制应用)
+[data-theme]
+  body, #header, #footer, .content
+    background-color: var(--color-background) !important
+    color: var(--color-text) !important
+    transition: background-color 0.3s ease, color 0.3s ease
+
+  a
+    color: var(--color-link) !important
+  
+  h1, h2, h3, h4, h5, h6, .post-title, p, li, .p-name
+    color: var(--color-text) !important
+
+  .meta, .post-meta
+    color: var(--color-meta) !important
+
+  figure.highlight, pre, code
+    background: var(--color-background-code) !important
+    color: var(--color-text) !important
+
+  blockquote
+    border-left: 4px solid var(--color-quote) !important
+    color: var(--color-meta) !important
+
+// 切换按钮样式 (始终使用默认颜色的 Accent-1)
+#theme-toggle
+  cursor: pointer
+  display: inline-block !important
+  vertical-align: middle
+  margin-left: 10px
+  border-right: 0 !important
+  
+  i
+    transition: transform 0.5s ease
+    color: #cc2a41 // Classic 默认的 Accent-1 颜色
+
+  &:hover i
+    color: #cc2a41
+    transform: rotate(30deg)

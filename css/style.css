@@ -1679,3 +1679,100 @@ code {
 #header-post #actions {
   direction: ltr !important;
 }
+:root {
+  --color-background: #fafafa;
+  --color-text: #22272a;
+  --color-link: rgba(86,124,119,0.4);
+  --color-accent-1: #cc2a41;
+  --color-background-code: #f5f5f5;
+  --color-meta: #666;
+  --color-quote: #cc2a41;
+}
+[data-theme="white"] {
+  --color-background: #fff;
+  --color-text: #383838;
+  --color-link: #d480aa;
+  --color-accent-1: #2bbc8a;
+  --color-background-code: #fdfdfd;
+  --color-meta: #666;
+  --color-quote: #2bbc8a;
+}
+[data-theme="classic"] {
+  --color-background: #fafafa;
+  --color-text: #22272a;
+  --color-link: rgba(86,124,119,0.4);
+  --color-accent-1: #cc2a41;
+  --color-background-code: #f5f5f5;
+  --color-meta: #666;
+  --color-quote: #cc2a41;
+}
+[data-theme="dark"] {
+  --color-background: #1d1f21;
+  --color-text: #c9cacc;
+  --color-link: #d480aa;
+  --color-accent-1: #2bbc8a;
+  --color-background-code: #282a36;
+  --color-meta: #908d8d;
+  --color-quote: #ccffb6;
+}
+[data-theme="light"] {
+  --color-background: #e2e0de;
+  --color-text: #363533;
+  --color-link: #2bbc8a;
+  --color-accent-1: #d44375;
+  --color-background-code: #dad8d6;
+  --color-meta: #666;
+  --color-quote: #ab2251;
+}
+[data-theme] body,
+[data-theme] #header,
+[data-theme] #footer,
+[data-theme] .content {
+  background-color: var(--color-background) !important;
+  color: var(--color-text) !important;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+[data-theme] a {
+  color: var(--color-link) !important;
+}
+[data-theme] h1,
+[data-theme] h2,
+[data-theme] h3,
+[data-theme] h4,
+[data-theme] h5,
+[data-theme] h6,
+[data-theme] .post-title,
+[data-theme] p,
+[data-theme] li,
+[data-theme] .p-name {
+  color: var(--color-text) !important;
+}
+[data-theme] .meta,
+[data-theme] .post-meta {
+  color: var(--color-meta) !important;
+}
+[data-theme] figure.highlight,
+[data-theme] pre,
+[data-theme] code {
+  background: var(--color-background-code) !important;
+  color: var(--color-text) !important;
+}
+[data-theme] blockquote {
+  border-left: 4px solid var(--color-quote) !important;
+  color: var(--color-meta) !important;
+}
+#theme-toggle {
+  cursor: pointer;
+  display: inline-block !important;
+  vertical-align: middle;
+  margin-left: 10px;
+  border-right: 0 !important;
+}
+#theme-toggle i {
+  transition: transform 0.5s ease;
+  color: #cc2a41;
+}
+#theme-toggle:hover i {
+  color: #cc2a41;
+  transform: rotate(30deg);
+}

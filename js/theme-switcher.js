@@ -1,11 +1,12 @@
+// themes/cactus/source/js/theme-switcher.js
+
 // 定义主题顺序
-const themes = ['white', 'classic', 'dark', 'light'];
+const themes = ['dark', 'white', 'classic', 'light', 'lavender'];
 
 // 切换逻辑
-window.toggleTheme = function() {
-    // 1. 获取当前主题 (从 localStorage 获取，如果没有则说明是默认状态)
-    // 注意：这里的默认值应与你 _config.yml 里的 colorscheme 一致
-    const currentTheme = localStorage.getItem('theme') || 'classic';
+function toggleTheme() {
+    // 1. 获取当前主题
+    const currentTheme = localStorage.getItem('theme') || 'dark';
 
     // 2. 计算下一个主题
     const currentIndex = themes.indexOf(currentTheme);
@@ -17,14 +18,5 @@ window.toggleTheme = function() {
 
     // 4. 保存到本地存储
     localStorage.setItem('theme', nextTheme);
-    
-    console.log('Theme switched to:', nextTheme);
-};
-
-// 页面加载时初始化
-document.addEventListener('DOMContentLoaded', () => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    }
-});
+    console.log("Theme switched to: " + nextTheme);
+}

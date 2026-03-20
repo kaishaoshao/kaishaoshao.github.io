@@ -1,5 +1,5 @@
 ---
-title: '[gpt] Makemore'
+title: '[gpt] Zero to Hero'
 date: 2026-03-20 10:39:18
 tags:
 ---

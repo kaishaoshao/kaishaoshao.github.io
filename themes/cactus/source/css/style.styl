@@ -234,90 +234,113 @@ code
 #header-post #actions
   direction: ltr !important
 
-// --- 主题切换逻辑 (Theme Switcher) ---
+// --- Theme Switcher Core Logic ---
 
+// Default (Set to Dark Theme as requested)
 :root
-  // 默认值 (Classic)
-  --color-background: #fafafa
-  --color-text: #22272a
-  --color-link: rgba(86, 124, 119, .4)
-  --color-accent-1: #cc2a41
-  --color-background-code: #f5f5f5
-  --color-meta: #666
-  --color-quote: #cc2a41
-
-[data-theme="white"]
-  --color-background: #FFFFFF
-  --color-text: #383838
-  --color-link: rgba(212, 128, 170, 1)
-  --color-accent-1: #2bbc8a
-  --color-background-code: #fdfdfd
-  --color-meta: #666
-  --color-quote: #2bbc8a
-
-[data-theme="classic"]
-  --color-background: #fafafa
-  --color-text: #22272a
-  --color-link: rgba(86, 124, 119, .4)
-  --color-accent-1: #cc2a41
-  --color-background-code: #f5f5f5
-  --color-meta: #666
-  --color-quote: #cc2a41
+  --color-background: #1a1a1a
+  --color-text: #e5e5e5
+  --color-link: #f472b6
+  --color-accent-1: #2dd4bf
+  --color-background-code: #212121
+  --color-meta: #a3a3a3
+  --color-quote: #4ade80
+  --color-border: #404040
 
 [data-theme="dark"]
-  --color-background: #1d1f21
-  --color-text: #c9cacc
-  --color-link: rgba(212, 128, 170, 1)
-  --color-accent-1: #2bbc8a
-  --color-background-code: #282a36
-  --color-meta: #908d8d
-  --color-quote: #ccffb6
+  --color-background: #1a1a1a
+  --color-text: #e5e5e5
+  --color-link: #f472b6
+  --color-accent-1: #2dd4bf
+  --color-background-code: #212121
+  --color-meta: #a3a3a3
+  --color-quote: #4ade80
+  --color-border: #404040
+
+[data-theme="white"]
+  --color-background: #ffffff
+  --color-text: #171717
+  --color-link: #f472b6
+  --color-accent-1: #10b981
+  --color-background-code: #f3f4f6
+  --color-meta: #737373
+  --color-quote: #10b981
+  --color-border: #e5e5e5
+
+[data-theme="classic"]
+  --color-background: #fdfdfc
+  --color-text: #171717
+  --color-link: #0d9488
+  --color-accent-1: #dc2626
+  --color-background-code: #f5f5f4
+  --color-meta: #737373
+  --color-quote: #dc2626
+  --color-border: #e5e5e5
 
 [data-theme="light"]
-  --color-background: #e2e0de
-  --color-text: #363533
-  --color-link: rgba(43, 188, 138, 1)
-  --color-accent-1: #d44375
-  --color-background-code: #dad8d6
-  --color-meta: #666
-  --color-quote: #ab2251
+  --color-background: #eae7e2
+  --color-text: #292524
+  --color-link: #059669
+  --color-accent-1: #e11d48
+  --color-background-code: #e2dfda
+  --color-meta: #78716c
+  --color-quote: #be123c
+  --color-border: #a8a29e
 
-// 应用变量覆盖 (仅在 [data-theme] 存在时强制应用)
+[data-theme="lavender"]
+  --color-background: #f9f8ff
+  --color-text: #312e81
+  --color-link: #8b5cf6
+  --color-accent-1: #a78bfa
+  --color-background-code: #f3f1ff
+  --color-meta: #8b85b1
+  --color-quote: #7c3aed
+  --color-border: #e9e4ff
+
+// Apply variables globally when a theme is set
 [data-theme]
+  background-color: var(--color-background) !important
+  color: var(--color-text) !important
+  transition: background-color 0.3s ease, color 0.3s ease
+  
   body, #header, #footer, .content
     background-color: var(--color-background) !important
     color: var(--color-text) !important
-    transition: background-color 0.3s ease, color 0.3s ease
 
   a
     color: var(--color-link) !important
-  
-  h1, h2, h3, h4, h5, h6, .post-title, p, li, .p-name
+    &:hover
+      background-image: linear-gradient(transparent, transparent 4px, var(--color-link) 4px, var(--color-link))
+
+  h1, h2, h3, h4, h5, h6, .post-title, p, li, .p-name, .logo
     color: var(--color-text) !important
 
-  .meta, .post-meta
+  .meta, .post-meta, .footer-left, .footer-right a
     color: var(--color-meta) !important
 
   figure.highlight, pre, code
     background: var(--color-background-code) !important
     color: var(--color-text) !important
+    border-color: var(--color-border) !important
 
   blockquote
     border-left: 4px solid var(--color-quote) !important
     color: var(--color-meta) !important
 
-// 切换按钮样式 (始终使用默认颜色的 Accent-1)
+  #header #nav ul li a
+    color: var(--color-text) !important
+    &:hover
+      color: var(--color-link) !important
+
+// Special case for theme toggle icon color
 #theme-toggle
-  cursor: pointer
   display: inline-block !important
-  vertical-align: middle
+  cursor: pointer
   margin-left: 10px
-  border-right: 0 !important
   
   i
-    transition: transform 0.5s ease
-    color: #cc2a41 // Classic 默认的 Accent-1 颜色
+    color: var(--color-accent-1) !important
+    transition: transform 0.3s ease
 
   &:hover i
-    color: #cc2a41
     transform: rotate(30deg)

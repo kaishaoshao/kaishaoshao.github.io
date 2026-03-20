@@ -1,12 +1,12 @@
 // source/js/theme-switcher.js
 
 // 定义主题顺序
-const themes = ['white', 'classic', 'dark', 'light'];
+const themes = ['dark', 'white', 'classic', 'light', 'lavender'];
 
 // 切换逻辑
 function toggleTheme() {
     // 1. 获取当前主题
-    const currentTheme = localStorage.getItem('theme') || 'white';
+    const currentTheme = localStorage.getItem('theme') || 'dark';
 
     // 2. 计算下一个主题
     const currentIndex = themes.indexOf(currentTheme);

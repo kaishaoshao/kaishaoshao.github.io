@@ -6,7 +6,7 @@ const themes = ['dark', 'white', 'classic', 'light', 'lavender'];
 // 切换逻辑
 function toggleTheme() {
     // 1. 获取当前主题
-    const currentTheme = localStorage.getItem('theme') || 'dark';
+    const currentTheme = localStorage.getItem('theme') || 'lavender';
 
     // 2. 计算下一个主题
     const currentIndex = themes.indexOf(currentTheme);

@@ -14,7 +14,7 @@
 <meta property="og:description" content="代码优化指南：从算法到裸机架构核心法则： 在进行任何优化之前，清先进行Profiling(性能分析) 凭直觉的优化往往是徒劳的。只有找出真正的性能瓶颈(Hotspots),优化才有意义 优化层级概述   优化层级 核心关注点 预期收益 适用场景    一、 算法级 复杂度降低、数学模型替换 极高（指数级提升） 系统设计初期、核心计算模块   二、 内存级 缓存命中率、数据局部性 高（打破内存墙）">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2026-03-11T02:05:26.000Z">
-<meta property="article:modified_time" content="2026-03-12T11:31:58.532Z">
+<meta property="article:modified_time" content="2026-03-20T02:22:49.195Z">
 <meta property="article:author" content="kaishaoshao">
 <meta name="twitter:card" content="summary">
     
@@ -90,6 +90,8 @@
     <span id="actions">
       <ul>
         
+        <li><a class="icon" aria-label="Previous post" href="/2026/03/20/ai-Makemore/"><i class="fa-solid fa-chevron-left" aria-hidden="true" onmouseover="$('#i-prev').toggle();" onmouseout="$('#i-prev').toggle();"></i></a></li>
+        
         
         <li><a class="icon" aria-label="Next post" href="/2025/12/19/hello-world/"><i class="fa-solid fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
         
@@ -121,7 +123,7 @@
     
     
       <div id="toc">
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E4%BC%98%E5%8C%96%E6%8C%87%E5%8D%97%EF%BC%9A%E4%BB%8E%E7%AE%97%E6%B3%95%E5%88%B0%E8%A3%B8%E6%9C%BA%E6%9E%B6%E6%9E%84"><span class="toc-number">1.</span> <span class="toc-text">代码优化指南：从算法到裸机架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E5%8C%96%E5%B1%82%E7%BA%A7%E6%A6%82%E8%BF%B0"><span class="toc-number">1.1.</span> <span class="toc-text">优化层级概述</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">2.</span> <span class="toc-text">算法与数据结构级优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">2.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E4%B8%8E%E7%BC%93%E5%AD%98%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BC%98%E5%8C%96"><span class="toc-number">3.</span> <span class="toc-text">内存与缓存友好型优化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-1"><span class="toc-number">4.</span> <span class="toc-text">核心思想</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BB%A3%E7%A0%81"><span class="toc-number">5.</span> <span class="toc-text">编译器友好型代码</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-2"><span class="toc-number">5.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E4%B8%8E%E7%A1%AC%E4%BB%B6%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">6.</span> <span class="toc-text">架构与硬件级优化</span></a></li></ol>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E4%BC%98%E5%8C%96%E6%8C%87%E5%8D%97%EF%BC%9A%E4%BB%8E%E7%AE%97%E6%B3%95%E5%88%B0%E8%A3%B8%E6%9C%BA%E6%9E%B6%E6%9E%84"><span class="toc-number">1.</span> <span class="toc-text">代码优化指南：从算法到裸机架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E5%8C%96%E5%B1%82%E7%BA%A7%E6%A6%82%E8%BF%B0"><span class="toc-number">1.1.</span> <span class="toc-text">优化层级概述</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">2.</span> <span class="toc-text">算法与数据结构级优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">2.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E4%B8%8E%E7%BC%93%E5%AD%98%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BC%98%E5%8C%96"><span class="toc-number">3.</span> <span class="toc-text">内存与缓存友好型优化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-1"><span class="toc-number">4.</span> <span class="toc-text">核心思想</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BB%A3%E7%A0%81"><span class="toc-number">5.</span> <span class="toc-text">编译器友好型代码</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-2"><span class="toc-number">5.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E4%B8%8E%E7%A1%AC%E4%BB%B6%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">6.</span> <span class="toc-text">架构与硬件级优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-3"><span class="toc-number">6.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li></ol>
       </div>
     
   </span>
@@ -208,11 +210,26 @@
 <li>寻找更优的数学等价替换</li>
 <li>空间换时间（如查表）</li>
 </ul>
-<p>例： 数学信号处理中的频域转换</p>
+<p>例1： 数学信号处理中的频域转换</p>
 <ul>
-<li><strong>未优化(DFT):</strong> 嵌入式循环遍历，时间复杂度O(N^2)</li>
-<li><strong>优化后 (FFT)：</strong> 采用快速傅里叶变换（FFT）的蝶形分治算法，时间复杂度骤降至 $O(N \log N)$。当采样点变大时，性能差异是天壤之别。</li>
+<li><p><strong>未优化(DFT):</strong> 嵌入式循环遍历，时间复杂度O(N^2)</p>
+</li>
+<li><p><strong>优化后 (FFT)：</strong> 采用快速傅里叶变换（FFT）的蝶形分治算法，时间复杂度骤降至 $O(N \log N)$。当采样点变大时，性能差异是天壤之别。</p>
+<p>TODO: 代码实现</p>
+</li>
 </ul>
+<p>例2： 内存与数据布局（结构体对齐）</p>
+<ul>
+<li>非优化： 按直觉定义</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 假设在 64 位系统上</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Node_Bad</span> &#123;</span></span><br><span class="line">    <span class="type">char</span> a;     <span class="comment">// 1 byte</span></span><br><span class="line">                <span class="comment">// 7 bytes padding (为了让下一个 double 对齐)</span></span><br><span class="line">    <span class="type">double</span> b;   <span class="comment">// 8 bytes</span></span><br><span class="line">    <span class="type">int</span> c;      <span class="comment">// 4 bytes</span></span><br><span class="line">                <span class="comment">// 4 bytes padding (为了让整个结构体大小是 8 的倍数)</span></span><br><span class="line">&#125;; </span><br><span class="line"><span class="comment">// sizeof(Node_Bad) = 24 bytes</span></span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>优化后：按类型大小降序</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">Node_Good</span> &#123;</span></span><br><span class="line">    <span class="type">double</span> b;   <span class="comment">// 8 bytes</span></span><br><span class="line">    <span class="type">int</span> c;      <span class="comment">// 4 bytes</span></span><br><span class="line">    <span class="type">char</span> a;     <span class="comment">// 1 byte</span></span><br><span class="line">                <span class="comment">// 3 bytes padding </span></span><br><span class="line">&#125;;</span><br><span class="line"><span class="comment">// sizeof(Node_Good) = 16 bytes</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>收益：</strong> 仅仅是调整了声明顺序，结构体体积就缩小了 33%。如果在深度学习模型或嵌入式节点中分配一百万个这样的结构体，直接节省了 8MB 的宝贵内存，同时大幅提升了缓存行（Cache Line）的数据密度。</p>
 <h2 id="内存与缓存友好型优化"><a href="#内存与缓存友好型优化" class="headerlink" title="内存与缓存友好型优化"></a>内存与缓存友好型优化</h2><p>现代处理器的运算速度远超内存的读写速度。优化代码的内存访问模式，让数据尽可能留在 CPU Cache 中，是打破“内存墙”的关键。</p>
 <h2 id="核心思想-1"><a href="#核心思想-1" class="headerlink" title="核心思想"></a>核心思想</h2><ul>
 <li><p><strong>空间局部性：</strong> 数据结构在内存中尽量紧凑排列。</p>
@@ -235,8 +252,30 @@
 <li>结构化循环，方便编译器进行中间表示（IR）分析和自动展开。</li>
 </ul>
 <p>例1：指针别名阻碍优化</p>
-<p>当函数</p>
-<h2 id="架构与硬件级优化"><a href="#架构与硬件级优化" class="headerlink" title="架构与硬件级优化"></a>架构与硬件级优化</h2>
+<p>当函数接收多个指针时，编译器默认它们可能指向同一块内存，从而放弃积极的指令重排或向量化。</p>
+<ul>
+<li>反面教材（保守生成标量指令）</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">add_arrays</span><span class="params">(<span class="type">float</span>* a, <span class="type">float</span>* b, <span class="type">float</span>* c, <span class="type">int</span> n)</span> &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">        a[i] = b[i] + c[i];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>优化后（使用restrict关键字）</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 明确告知编译器：a, b, c 指向的内存绝对互不重叠</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">add_arrays_opt</span><span class="params">(<span class="type">float</span>* <span class="keyword">restrict</span> a, <span class="type">const</span> <span class="type">float</span>* <span class="keyword">restrict</span> b, <span class="type">const</span> <span class="type">float</span>* <span class="keyword">restrict</span> c, <span class="type">int</span> n)</span> &#123;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; n; i++) &#123;</span><br><span class="line">        a[i] = b[i] + c[i];</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h2 id="架构与硬件级优化"><a href="#架构与硬件级优化" class="headerlink" title="架构与硬件级优化"></a>架构与硬件级优化</h2><p>当编译器自动优化达到瓶颈，需要针对特定的硬件架构（如 x86, ARM, 或 RISC-V）榨干最后一滴算力。</p>
+<h3 id="核心思想-3"><a href="#核心思想-3" class="headerlink" title="核心思想"></a>核心思想</h3><ul>
+<li>利用单指令多数据（SIMD）机制处理并行数据</li>
+<li>消除分支预测失败造成的流水线冲刷</li>
+</ul>
+<p>示例：利用向量指令集加速</p>
+<p>对于密集的计算（如深度学习算子或图像处理），可以使用架构专属的向量扩展（例如 RISC-V Vector Extension, RVV）。</p>
+<ul>
+<li><strong>优化思路：</strong> 通过引入 Intrinsics 内置函数或内联汇编，将原本需要循环 $N$ 次的标量加法，打包交由硬件的向量寄存器处理。假设向量寄存器宽度支持同时处理 8 个浮点数，循环次数将直接缩减为 N&#x2F;8，大幅提升吞吐量。</li>
+</ul>
+
   </div>
 </article>
 
@@ -263,7 +302,7 @@
     
     
       <div id="toc-footer" style="display: none">
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E4%BC%98%E5%8C%96%E6%8C%87%E5%8D%97%EF%BC%9A%E4%BB%8E%E7%AE%97%E6%B3%95%E5%88%B0%E8%A3%B8%E6%9C%BA%E6%9E%B6%E6%9E%84"><span class="toc-number">1.</span> <span class="toc-text">代码优化指南：从算法到裸机架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E5%8C%96%E5%B1%82%E7%BA%A7%E6%A6%82%E8%BF%B0"><span class="toc-number">1.1.</span> <span class="toc-text">优化层级概述</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">2.</span> <span class="toc-text">算法与数据结构级优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">2.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E4%B8%8E%E7%BC%93%E5%AD%98%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BC%98%E5%8C%96"><span class="toc-number">3.</span> <span class="toc-text">内存与缓存友好型优化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-1"><span class="toc-number">4.</span> <span class="toc-text">核心思想</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BB%A3%E7%A0%81"><span class="toc-number">5.</span> <span class="toc-text">编译器友好型代码</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-2"><span class="toc-number">5.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E4%B8%8E%E7%A1%AC%E4%BB%B6%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">6.</span> <span class="toc-text">架构与硬件级优化</span></a></li></ol>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E4%BC%98%E5%8C%96%E6%8C%87%E5%8D%97%EF%BC%9A%E4%BB%8E%E7%AE%97%E6%B3%95%E5%88%B0%E8%A3%B8%E6%9C%BA%E6%9E%B6%E6%9E%84"><span class="toc-number">1.</span> <span class="toc-text">代码优化指南：从算法到裸机架构</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BC%98%E5%8C%96%E5%B1%82%E7%BA%A7%E6%A6%82%E8%BF%B0"><span class="toc-number">1.1.</span> <span class="toc-text">优化层级概述</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%AE%97%E6%B3%95%E4%B8%8E%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">2.</span> <span class="toc-text">算法与数据结构级优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">2.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%86%85%E5%AD%98%E4%B8%8E%E7%BC%93%E5%AD%98%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BC%98%E5%8C%96"><span class="toc-number">3.</span> <span class="toc-text">内存与缓存友好型优化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-1"><span class="toc-number">4.</span> <span class="toc-text">核心思想</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E7%BC%96%E8%AF%91%E5%99%A8%E5%8F%8B%E5%A5%BD%E5%9E%8B%E4%BB%A3%E7%A0%81"><span class="toc-number">5.</span> <span class="toc-text">编译器友好型代码</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-2"><span class="toc-number">5.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9E%B6%E6%9E%84%E4%B8%8E%E7%A1%AC%E4%BB%B6%E7%BA%A7%E4%BC%98%E5%8C%96"><span class="toc-number">6.</span> <span class="toc-text">架构与硬件级优化</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3-3"><span class="toc-number">6.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li></ol>
       </div>
     
 

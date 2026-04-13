@@ -6,15 +6,15 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="HandheldFriendly" content="True">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-    <meta name="description" content="一：实现简单矩阵乘法123#include &lt;stdio.h&gt;    二： 理解性能瓶颈—缓存三：优化1—循环交换四： 优化2—分块(Tiling&#x2F;Blocking)五： 优化3—SIMD向量化六：优化4—分块 + SIMD + 展开七： 参考OpenBLAS工业级实现">
+    <meta name="description" content="一：实现简单矩阵乘法1234567891011121314151617181920212223242526272829303132333435#include &lt;stdio.h&gt;#include &lt;stdlib.h&gt;#include &lt;time.h&gt;&#x2F;&#x2F; C&#x3D;A*B, A&#x3D;M*N, B&#x3D;N*P  &#x3D;&#x3D;&gt; C&#x3D;M*Pvoid matmul_naive(int">
 <meta property="og:type" content="article">
 <meta property="og:title" content="程序性能优化之矩阵乘法(1)">
 <meta property="og:url" content="http://example.com/2026/03/23/%E7%A8%8B%E5%BA%8F%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E4%B9%8B%E7%9F%A9%E9%98%B5%E4%B9%98%E6%B3%95-1/index.html">
 <meta property="og:site_name" content="kaishaoshao">
-<meta property="og:description" content="一：实现简单矩阵乘法123#include &lt;stdio.h&gt;    二： 理解性能瓶颈—缓存三：优化1—循环交换四： 优化2—分块(Tiling&#x2F;Blocking)五： 优化3—SIMD向量化六：优化4—分块 + SIMD + 展开七： 参考OpenBLAS工业级实现">
+<meta property="og:description" content="一：实现简单矩阵乘法1234567891011121314151617181920212223242526272829303132333435#include &lt;stdio.h&gt;#include &lt;stdlib.h&gt;#include &lt;time.h&gt;&#x2F;&#x2F; C&#x3D;A*B, A&#x3D;M*N, B&#x3D;N*P  &#x3D;&#x3D;&gt; C&#x3D;M*Pvoid matmul_naive(int">
 <meta property="og:locale" content="en_US">
 <meta property="article:published_time" content="2026-03-23T10:01:07.000Z">
-<meta property="article:modified_time" content="2026-03-23T10:22:50.578Z">
+<meta property="article:modified_time" content="2026-04-13T03:58:22.604Z">
 <meta property="article:author" content="kaishaoshao">
 <meta name="twitter:card" content="summary">
     
@@ -121,7 +121,7 @@
     
     
       <div id="toc">
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%EF%BC%9A%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E7%9F%A9%E9%98%B5%E4%B9%98%E6%B3%95"><span class="toc-number">1.</span> <span class="toc-text">一：实现简单矩阵乘法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%EF%BC%9A-%E7%90%86%E8%A7%A3%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88%E2%80%94%E7%BC%93%E5%AD%98"><span class="toc-number">2.</span> <span class="toc-text">二： 理解性能瓶颈—缓存</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%EF%BC%9A%E4%BC%98%E5%8C%961%E2%80%94%E5%BE%AA%E7%8E%AF%E4%BA%A4%E6%8D%A2"><span class="toc-number">3.</span> <span class="toc-text">三：优化1—循环交换</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%EF%BC%9A-%E4%BC%98%E5%8C%962%E2%80%94%E5%88%86%E5%9D%97-Tiling-Blocking"><span class="toc-number">4.</span> <span class="toc-text">四： 优化2—分块(Tiling&#x2F;Blocking)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%EF%BC%9A-%E4%BC%98%E5%8C%963%E2%80%94SIMD%E5%90%91%E9%87%8F%E5%8C%96"><span class="toc-number">5.</span> <span class="toc-text">五： 优化3—SIMD向量化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%EF%BC%9A%E4%BC%98%E5%8C%964%E2%80%94%E5%88%86%E5%9D%97-SIMD-%E5%B1%95%E5%BC%80"><span class="toc-number">6.</span> <span class="toc-text">六：优化4—分块 + SIMD + 展开</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%EF%BC%9A-%E5%8F%82%E8%80%83OpenBLAS%E5%B7%A5%E4%B8%9A%E7%BA%A7%E5%AE%9E%E7%8E%B0"><span class="toc-number">7.</span> <span class="toc-text">七： 参考OpenBLAS工业级实现</span></a></li></ol>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%EF%BC%9A%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E7%9F%A9%E9%98%B5%E4%B9%98%E6%B3%95"><span class="toc-number">1.</span> <span class="toc-text">一：实现简单矩阵乘法</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E7%9B%B4%E8%A7%82%E6%80%A7"><span class="toc-number">1.1.</span> <span class="toc-text">代码直观性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E8%A7%82%E5%AF%9F%EF%BC%9A%E8%A1%8C%E7%9A%84%E5%85%83%E7%B4%A0%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E8%BF%9E%E7%BB%AD"><span class="toc-number">1.2.</span> <span class="toc-text">关键观察：行的元素在内存中连续</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%EF%BC%9A-%E7%90%86%E8%A7%A3%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88%E2%80%94%E7%BC%93%E5%AD%98"><span class="toc-number">2.</span> <span class="toc-text">二： 理解性能瓶颈—缓存</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BC%93%E5%AD%98%E8%A1%8C%EF%BC%88Cache-Line%EF%BC%89"><span class="toc-number">2.1.</span> <span class="toc-text">缓存行（Cache Line）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%EF%BC%9A%E4%BC%98%E5%8C%961%E2%80%94%E5%BE%AA%E7%8E%AF%E4%BA%A4%E6%8D%A2"><span class="toc-number">3.</span> <span class="toc-text">三：优化1—循环交换</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%EF%BC%9A-%E4%BC%98%E5%8C%962%E2%80%94%E5%88%86%E5%9D%97-Tiling-Blocking"><span class="toc-number">4.</span> <span class="toc-text">四： 优化2—分块(Tiling&#x2F;Blocking)</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">4.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%EF%BC%9A-%E4%BC%98%E5%8C%963%E2%80%94SIMD%E5%90%91%E9%87%8F%E5%8C%96"><span class="toc-number">5.</span> <span class="toc-text">五： 优化3—SIMD向量化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%EF%BC%9A%E4%BC%98%E5%8C%964%E2%80%94%E5%88%86%E5%9D%97-SIMD-%E5%B1%95%E5%BC%80"><span class="toc-number">6.</span> <span class="toc-text">六：优化4—分块 + SIMD + 展开</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%EF%BC%9A-%E5%8F%82%E8%80%83OpenBLAS%E5%B7%A5%E4%B8%9A%E7%BA%A7%E5%AE%9E%E7%8E%B0"><span class="toc-number">7.</span> <span class="toc-text">七： 参考OpenBLAS工业级实现</span></a></li></ol>
       </div>
     
   </span>
@@ -161,11 +161,99 @@
   
 
   <div class="content e-content" itemprop="articleBody">
-    <h2 id="一：实现简单矩阵乘法"><a href="#一：实现简单矩阵乘法" class="headerlink" title="一：实现简单矩阵乘法"></a>一：实现简单矩阵乘法</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+    <h2 id="一：实现简单矩阵乘法"><a href="#一：实现简单矩阵乘法" class="headerlink" title="一：实现简单矩阵乘法"></a>一：实现简单矩阵乘法</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;time.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// C=A*B, A=M*N, B=N*P  ==&gt; C=M*P</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">matmul_naive</span><span class="params">(<span class="type">int</span> M, <span class="type">int</span> N, <span class="type">int</span> P,</span></span><br><span class="line"><span class="params">		              <span class="type">double</span> *A, <span class="type">double</span> *B, <span class="type">double</span> *C)</span> &#123;</span><br><span class="line"><span class="comment">// 初始化C为0</span></span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i = <span class="number">0</span>; i &lt; M*P; i++)</span><br><span class="line">    C[i] = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">for</span>(<span class="type">int</span> i = <span class="number">0</span>; i &lt; M; i++)</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; P; j++)</span><br><span class="line">      <span class="keyword">for</span> (<span class="type">int</span> k = <span class="number">0</span>; k &lt; N; k++)</span><br><span class="line">        C[i * P + j] = A[i * N + k] * B[k * P + j];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">  <span class="type">int</span> M = <span class="number">512</span>, N = <span class="number">512</span>, P = <span class="number">512</span>;</span><br><span class="line">  <span class="type">double</span> *A = <span class="built_in">malloc</span>(M * N * <span class="keyword">sizeof</span>(<span class="type">double</span>));</span><br><span class="line">  <span class="type">double</span> *B = <span class="built_in">malloc</span>(N * P * <span class="keyword">sizeof</span>(<span class="type">double</span>));</span><br><span class="line">  <span class="type">double</span> *C = <span class="built_in">malloc</span>(M * P * <span class="keyword">sizeof</span>(<span class="type">double</span>));</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 随机初始化</span></span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; M * N; i++)</span><br><span class="line">    A[i] = (<span class="type">double</span>)rand() / RAND_MAX;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; N * P; i++)</span><br><span class="line">    B[i] = (<span class="type">double</span>)rand() / RAND_MAX;</span><br><span class="line">  <span class="type">clock_t</span> start = clock();</span><br><span class="line">  matmul_naive(M, N, P, A, B, C);</span><br><span class="line">  <span class="built_in">printf</span>(<span class="string">&quot;Naive: %.3f s\n&quot;</span>, (<span class="type">double</span>)(clock() - start) / CLOCKS_PER_SEC);</span><br><span class="line">  <span class="built_in">free</span>(A);</span><br><span class="line">  <span class="built_in">free</span>(B);</span><br><span class="line">  <span class="built_in">free</span>(C);</span><br><span class="line">  <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>问题:<strong>行优先（Row-Major）vs 列优先（Column-Major）</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">C[i][j] = C[i * P + j]   // 行优先：第i行第j列</span><br><span class="line">             ↑      ↑</span><br><span class="line">         行偏移   列偏移</span><br></pre></td></tr></table></figure>
+
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>公式</th>
+<th>含义</th>
+<th>使用场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>行优先</strong></td>
+<td><code>i * 列数 + j</code></td>
+<td>一行一行存</td>
+<td>C&#x2F;C++&#x2F;Python&#x2F;NumPy默认</td>
+</tr>
+<tr>
+<td><strong>列优先</strong></td>
+<td><code>j * 行数 + i</code></td>
+<td>一列一列存</td>
+<td>Fortran&#x2F;MATLAB默认</td>
+</tr>
+</tbody></table>
+<p> 直观图解</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">内存地址增长方向 → → → → → → → → → → → →</span><br><span class="line"></span><br><span class="line">行优先存储（C语言）：</span><br><span class="line">[0][0] [0][1] [0][2] [0][3] | [1][0] [1][1] [1][2] [1][3] | [2][0] [2][1] [2][2] </span><br><span class="line">  0      1      2      3        4      5      6      7        8      9     10     </span><br><span class="line">[2][3]</span><br><span class="line">  11</span><br><span class="line"></span><br><span class="line">列优先存储（Fortran）：</span><br><span class="line">[0][0] [1][0] [2][0] | [0][1] [1][1] [2][1] | [0][2] [1][2] [2][2] | [0][3] [1][3] </span><br><span class="line">  0      1      2        3      4      5        6      7      8        9     10   </span><br><span class="line">[2][3]</span><br><span class="line">  11</span><br></pre></td></tr></table></figure>
+
+<p>为什么c语言行优先</p>
+<h3 id="代码直观性"><a href="#代码直观性" class="headerlink" title="代码直观性"></a>代码直观性</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 二维数组在C中的声明</span></span><br><span class="line"><span class="type">double</span> C[<span class="number">3</span>][<span class="number">4</span>];  <span class="comment">// 3行4列</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 访问方式完全匹配直觉</span></span><br><span class="line">C[i][j]  <span class="comment">// 第i行，第j列</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 编译器实际转换的公式（行优先）</span></span><br><span class="line">*((<span class="type">double</span>*)C + i * <span class="number">4</span> + j)</span><br></pre></td></tr></table></figure>
+
+<h3 id="关键观察：行的元素在内存中连续"><a href="#关键观察：行的元素在内存中连续" class="headerlink" title="关键观察：行的元素在内存中连续"></a>关键观察：行的元素在内存中连续</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 遍历一行（快！缓存友好）</span></span><br><span class="line"><span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; <span class="number">4</span>; j++)</span><br><span class="line">    C[i][j] = ...;  <span class="comment">// 访问 0,1,2,3 连续地址</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 遍历一列（慢！缓存不友好）  </span></span><br><span class="line"><span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; <span class="number">3</span>; i++)</span><br><span class="line">    C[i][j] = ...;  <span class="comment">// 访问 0,4,8 跳跃地址</span></span><br></pre></td></tr></table></figure>
 
 
 
-<h2 id="二：-理解性能瓶颈—缓存"><a href="#二：-理解性能瓶颈—缓存" class="headerlink" title="二： 理解性能瓶颈—缓存"></a>二： 理解性能瓶颈—缓存</h2><h2 id="三：优化1—循环交换"><a href="#三：优化1—循环交换" class="headerlink" title="三：优化1—循环交换"></a>三：优化1—循环交换</h2><h2 id="四：-优化2—分块-Tiling-Blocking"><a href="#四：-优化2—分块-Tiling-Blocking" class="headerlink" title="四： 优化2—分块(Tiling&#x2F;Blocking)"></a>四： 优化2—分块(Tiling&#x2F;Blocking)</h2><h2 id="五：-优化3—SIMD向量化"><a href="#五：-优化3—SIMD向量化" class="headerlink" title="五： 优化3—SIMD向量化"></a>五： 优化3—SIMD向量化</h2><h2 id="六：优化4—分块-SIMD-展开"><a href="#六：优化4—分块-SIMD-展开" class="headerlink" title="六：优化4—分块 + SIMD + 展开"></a>六：优化4—分块 + SIMD + 展开</h2><h2 id="七：-参考OpenBLAS工业级实现"><a href="#七：-参考OpenBLAS工业级实现" class="headerlink" title="七： 参考OpenBLAS工业级实现"></a>七： 参考OpenBLAS工业级实现</h2>
+<h2 id="二：-理解性能瓶颈—缓存"><a href="#二：-理解性能瓶颈—缓存" class="headerlink" title="二： 理解性能瓶颈—缓存"></a>二： 理解性能瓶颈—缓存</h2><p>内存层次(速度差异巨大)</p>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>访问时间</th>
+<th>容量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU寄存器</td>
+<td>~0.3 ns</td>
+<td>几十个</td>
+</tr>
+<tr>
+<td>L1缓存</td>
+<td>~1 ns</td>
+<td>32-64 KB</td>
+</tr>
+<tr>
+<td>L2缓存</td>
+<td>~4 ns</td>
+<td>256-512 KB</td>
+</tr>
+<tr>
+<td>L3缓存</td>
+<td>~10 ns</td>
+<td>几-几十 MB</td>
+</tr>
+<tr>
+<td>内存(DRAM)</td>
+<td>~100 ns</td>
+<td>几-几十 GB</td>
+</tr>
+</tbody></table>
+<h3 id="缓存行（Cache-Line）"><a href="#缓存行（Cache-Line）" class="headerlink" title="缓存行（Cache Line）"></a>缓存行（Cache Line）</h3><p>CPU一次从内存取<strong>64字节</strong>（8个double）到缓存。</p>
+<p><strong>关键问题</strong>：如果访问的内存不连续，每次都要重新从内存加载！</p>
+<h2 id="三：优化1—循环交换"><a href="#三：优化1—循环交换" class="headerlink" title="三：优化1—循环交换"></a>三：优化1—循环交换</h2><p>问题分析：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 简单版本： 内层循环k, 访问B[k*P+j]</span></span><br><span class="line"><span class="comment">// k增加1,B的访问跳跃P个元素(不连续的！)</span></span><br><span class="line">C[i*P+j] += A[i*N+k] * B[k*p+j];</span><br><span class="line"><span class="comment">//          ^连续         ^跳跃</span></span><br></pre></td></tr></table></figure>
+
+<p>优化：让j在最内层（连续访问）</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">matmul_opt1</span><span class="params">(<span class="type">int</span> M, <span class="type">int</span> N, <span class="type">int</span> P, <span class="type">double</span> *A, <span class="type">double</span> *B, <span class="type">double</span> *C)</span> &#123;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; M * P; i++)</span><br><span class="line">    C[i] = <span class="number">0</span>;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; M; i++)</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> k = <span class="number">0</span>; k &lt; N; k++)</span><br><span class="line">      <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; P; j++)</span><br><span class="line">        C[i * P + j] += A[i * N + k] * B[k * P + j];</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="四：-优化2—分块-Tiling-Blocking"><a href="#四：-优化2—分块-Tiling-Blocking" class="headerlink" title="四： 优化2—分块(Tiling&#x2F;Blocking)"></a>四： 优化2—分块(Tiling&#x2F;Blocking)</h2><h3 id="核心思想"><a href="#核心思想" class="headerlink" title="核心思想"></a>核心思想</h3><p>缓存装不下整个矩阵，但装得下一个<strong>小块</strong>。</p>
+<p>把大矩阵乘法拆成小矩阵乘法，让小矩阵能留在缓存中复用。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────┐    ┌─────────────┐</span><br><span class="line">│ A11 │ A12   │    │ B11 │ B12   │</span><br><span class="line">├─────┼───────┤ ×  ├─────┼───────┤</span><br><span class="line">│ A21 │ A22   │    │ B21 │ B22   │</span><br><span class="line">└─────────────┘    └─────────────┘</span><br><span class="line"></span><br><span class="line">= 计算 <span class="number">2</span>×<span class="number">2</span> = <span class="number">4</span> 个小矩阵乘法</span><br><span class="line">  C11 = A11×B11 + A12×B21</span><br><span class="line">  C12 = A11×B12 + A12×B22</span><br><span class="line">  ...</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+
+
+
+
+<h2 id="五：-优化3—SIMD向量化"><a href="#五：-优化3—SIMD向量化" class="headerlink" title="五： 优化3—SIMD向量化"></a>五： 优化3—SIMD向量化</h2><h2 id="六：优化4—分块-SIMD-展开"><a href="#六：优化4—分块-SIMD-展开" class="headerlink" title="六：优化4—分块 + SIMD + 展开"></a>六：优化4—分块 + SIMD + 展开</h2><h2 id="七：-参考OpenBLAS工业级实现"><a href="#七：-参考OpenBLAS工业级实现" class="headerlink" title="七： 参考OpenBLAS工业级实现"></a>七： 参考OpenBLAS工业级实现</h2>
   </div>
 </article>
 
@@ -192,7 +280,7 @@
     
     
       <div id="toc-footer" style="display: none">
-        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%EF%BC%9A%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E7%9F%A9%E9%98%B5%E4%B9%98%E6%B3%95"><span class="toc-number">1.</span> <span class="toc-text">一：实现简单矩阵乘法</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%EF%BC%9A-%E7%90%86%E8%A7%A3%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88%E2%80%94%E7%BC%93%E5%AD%98"><span class="toc-number">2.</span> <span class="toc-text">二： 理解性能瓶颈—缓存</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%EF%BC%9A%E4%BC%98%E5%8C%961%E2%80%94%E5%BE%AA%E7%8E%AF%E4%BA%A4%E6%8D%A2"><span class="toc-number">3.</span> <span class="toc-text">三：优化1—循环交换</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%EF%BC%9A-%E4%BC%98%E5%8C%962%E2%80%94%E5%88%86%E5%9D%97-Tiling-Blocking"><span class="toc-number">4.</span> <span class="toc-text">四： 优化2—分块(Tiling&#x2F;Blocking)</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%EF%BC%9A-%E4%BC%98%E5%8C%963%E2%80%94SIMD%E5%90%91%E9%87%8F%E5%8C%96"><span class="toc-number">5.</span> <span class="toc-text">五： 优化3—SIMD向量化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%EF%BC%9A%E4%BC%98%E5%8C%964%E2%80%94%E5%88%86%E5%9D%97-SIMD-%E5%B1%95%E5%BC%80"><span class="toc-number">6.</span> <span class="toc-text">六：优化4—分块 + SIMD + 展开</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%EF%BC%9A-%E5%8F%82%E8%80%83OpenBLAS%E5%B7%A5%E4%B8%9A%E7%BA%A7%E5%AE%9E%E7%8E%B0"><span class="toc-number">7.</span> <span class="toc-text">七： 参考OpenBLAS工业级实现</span></a></li></ol>
+        <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%EF%BC%9A%E5%AE%9E%E7%8E%B0%E7%AE%80%E5%8D%95%E7%9F%A9%E9%98%B5%E4%B9%98%E6%B3%95"><span class="toc-number">1.</span> <span class="toc-text">一：实现简单矩阵乘法</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%BB%A3%E7%A0%81%E7%9B%B4%E8%A7%82%E6%80%A7"><span class="toc-number">1.1.</span> <span class="toc-text">代码直观性</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%85%B3%E9%94%AE%E8%A7%82%E5%AF%9F%EF%BC%9A%E8%A1%8C%E7%9A%84%E5%85%83%E7%B4%A0%E5%9C%A8%E5%86%85%E5%AD%98%E4%B8%AD%E8%BF%9E%E7%BB%AD"><span class="toc-number">1.2.</span> <span class="toc-text">关键观察：行的元素在内存中连续</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%EF%BC%9A-%E7%90%86%E8%A7%A3%E6%80%A7%E8%83%BD%E7%93%B6%E9%A2%88%E2%80%94%E7%BC%93%E5%AD%98"><span class="toc-number">2.</span> <span class="toc-text">二： 理解性能瓶颈—缓存</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%BC%93%E5%AD%98%E8%A1%8C%EF%BC%88Cache-Line%EF%BC%89"><span class="toc-number">2.1.</span> <span class="toc-text">缓存行（Cache Line）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%EF%BC%9A%E4%BC%98%E5%8C%961%E2%80%94%E5%BE%AA%E7%8E%AF%E4%BA%A4%E6%8D%A2"><span class="toc-number">3.</span> <span class="toc-text">三：优化1—循环交换</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%EF%BC%9A-%E4%BC%98%E5%8C%962%E2%80%94%E5%88%86%E5%9D%97-Tiling-Blocking"><span class="toc-number">4.</span> <span class="toc-text">四： 优化2—分块(Tiling&#x2F;Blocking)</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%A0%B8%E5%BF%83%E6%80%9D%E6%83%B3"><span class="toc-number">4.1.</span> <span class="toc-text">核心思想</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%EF%BC%9A-%E4%BC%98%E5%8C%963%E2%80%94SIMD%E5%90%91%E9%87%8F%E5%8C%96"><span class="toc-number">5.</span> <span class="toc-text">五： 优化3—SIMD向量化</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%EF%BC%9A%E4%BC%98%E5%8C%964%E2%80%94%E5%88%86%E5%9D%97-SIMD-%E5%B1%95%E5%BC%80"><span class="toc-number">6.</span> <span class="toc-text">六：优化4—分块 + SIMD + 展开</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%EF%BC%9A-%E5%8F%82%E8%80%83OpenBLAS%E5%B7%A5%E4%B8%9A%E7%BA%A7%E5%AE%9E%E7%8E%B0"><span class="toc-number">7.</span> <span class="toc-text">七： 参考OpenBLAS工业级实现</span></a></li></ol>
       </div>
     
 

@@ -41,18 +41,19 @@ jobs:
       # Commit the generated static site back to the main branch (or any deploy branch)
       - name: Deploy to main
         env:
-          # Personal Access Token with repo write permission, stored as a secret
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Ensure we are on the branch we want to push to (main)
+          # Switch to main branch without losing the build output
           git checkout main
-          # Copy built files into repo root (or a subdirectory like docs/)
-          # Here we replace the "public" folder with the new build output
-          rm -rf public || true
-          cp -r public .
-          # Add and commit changes if there are any
+          # Ensure the build output exists
+          if [ -d public ]; then
+            rm -rf public || true
+            cp -r public .
+          else
+            echo "⚠️ No 'public' folder found – skipping copy."
+          fi
           git add .
           if git diff --cached --quiet; then
             echo "No changes to deploy."

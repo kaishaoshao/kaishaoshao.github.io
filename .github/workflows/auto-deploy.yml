@@ -1,0 +1,60 @@
+name: Auto Deploy Quartz Site
+
+# Trigger on any push to feature branches (e.g., feat/quartz) or directly to main
+on:
+  push:
+    branches:
+      - 'feat/quartz'
+  schedule:
+    - cron: '0 2 * * *'  # 每天 UTC 02:00 运行，约合北京时间 10:00
+
+    # You can also listen to tags if you like
+    # tags:
+    #   - 'v*.*.*'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the entire repository (including history) so we can push back
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Set up Node.js (required for Quartz CLI)
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # Install project dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Build the Quartz site (outputs to the "public" folder by default)
+      - name: Build Quartz site
+        run: npx quartz build
+
+      # Commit the generated static site back to the main branch (or any deploy branch)
+      - name: Deploy to main
+        env:
+          # Personal Access Token with repo write permission, stored as a secret
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Ensure we are on the branch we want to push to (main)
+          git checkout main
+          # Copy built files into repo root (or a subdirectory like docs/)
+          # Here we replace the "public" folder with the new build output
+          rm -rf public || true
+          cp -r public .
+          # Add and commit changes if there are any
+          git add .
+          if git diff --cached --quiet; then
+            echo "No changes to deploy."
+          else
+            git commit -m "ci: auto‑deploy Quartz build [skip ci]"
+            git push origin main
+          fi

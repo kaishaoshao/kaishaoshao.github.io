@@ -47,6 +47,17 @@ export default (() => {
         <title>{title}</title>
         <meta charSet="utf-8" />
         {coreStylesheet && <link rel="preload" href={coreStylesheet} as="style" />}
+        {/* custom purple theme */}
+        <link rel="stylesheet" href="/static/css/custom.css" />
+        <style>{`
+            :root {
+              --accent: #6b5b95;
+              --accent-dark: #5a4a7d;
+              --accent-light: #9c86c0;
+            }
+            a, a:visited { color: var(--accent); }
+            a:hover { color: var(--accent-dark); }
+          `}</style>
         {coreScript && coreScript.contentType === "external" && (
           <link rel="preload" href={coreScript.src} as="script" />
         )}

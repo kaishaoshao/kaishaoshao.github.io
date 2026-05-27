@@ -1,0 +1,26 @@
+/* Purple theme enhancements */
+:root {
+  /* Primary colors */
+  --primary: #5b21b6;        /* main purple */
+  --primary-dark: #4c1a99;   /* darker for hover */
+  --primary-light: #c4b5fd;  /* accent */
+  /* Link colors */
+  --link: #7c3aed;
+  --link-hover: #5b21b6;
+  /* Code block */
+  --code-bg: rgba(196,181,253,0.15);
+  --code-text: #1f1a32;
+}
+/* Typography */
+body h1, body .h1 { color: var(--primary); font-size: 2rem; margin-top: 2rem; }
+body h2, body .h2 { color: var(--primary); font-size: 1.5rem; margin-top: 1.5rem; }
+body h3, body h4, body h5, body h6 { color: var(--primary-light); font-weight: 600; }
+/* Links */
+a { color: var(--link); text-decoration: underline; }
+a:hover { color: var(--link-hover); }
+/* Code blocks */
+pre, code { background: var(--code-bg); color: var(--code-text); padding: 0.2rem 0.4rem; border-radius: 4px; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; }
+th { background: var(--primary-light); color: var(--primary); padding: 0.5rem; }
+td { padding: 0.4rem; border-bottom: 1px solid var(--primary-light); }

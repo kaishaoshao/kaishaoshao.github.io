@@ -39,25 +39,10 @@ jobs:
         run: npx quartz build
 
       # Commit the generated static site back to the main branch (or any deploy branch)
-      - name: Deploy to main
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
+
+      - name: Deploy to main (using script)
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Switch to main branch without losing the build output
-          git checkout main
-          # Ensure the build output exists
-          if [ -d public ]; then
-            rm -rf public || true
-            cp -r public .
-          else
-            echo "⚠️ No 'public' folder found – skipping copy."
-          fi
-          git add .
-          if git diff --cached --quiet; then
-            echo "No changes to deploy."
-          else
-            git commit -m "ci: auto‑deploy Quartz build [skip ci]"
-            git push origin main
-          fi
+        run: ./scripts/deploy.sh

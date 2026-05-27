@@ -23,16 +23,14 @@ TMP_WT=$(mktemp -d)
 # 添加 main 分支的 worktree 到临时目录
 git worktree add "$TMP_WT" main
 
-# 在 worktree 中清空所有非 .git 文件（保留 .git 目录）
-shopt -s dotglob
-rm -rf "$TMP_WT"/*
-shopt -u dotglob
-
-# 将生成的 public 内容复制进去
-cp -r public/* "$TMP_WT"/
+# 在 worktree 中删除所有已追踪的文件（保留 .git）
+cd "$TMP_WT"
+# 移除工作区的所有文件（包括未追踪的）
+git rm -r --ignore-unmatch . || true
+# 复制生成的 public 内容到 worktree
+cp -r "$OLDPWD/public"/* .
 
 # 提交更改
-cd "$TMP_WT"
 git add .
 if git diff --cached --quiet; then
   echo "✅ 没有新的生成文件需要提交。"
@@ -50,7 +48,7 @@ else
 fi
 
 # ---------- 4️⃣ 清理临时 worktree ----------
-cd ..
+cd "$OLDPWD"
 git worktree remove "$TMP_WT" --force
 rm -rf "$TMP_WT"
 

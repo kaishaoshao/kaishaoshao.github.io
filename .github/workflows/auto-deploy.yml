@@ -1,4 +1,6 @@
 name: Auto Deploy Quartz Site
+permissions:
+  contents: write
 
 # Trigger on any push to feature branches (e.g., feat/quartz) or directly to main
 on:

@@ -13,14 +13,14 @@ title: kaishaoshao 的数字花园 🌱
 
 ### Notes
 
-- [[程序性能优化之矩阵乘法(1)|程序性能优化之矩阵乘法(1)]]：notes/程序性能优化之矩阵乘法-1.md
-- [[程序优化方法总结|程序优化方法总结]]：notes/程序优化方法总结.md
-- [["riscv rvv 学习"|"riscv rvv 学习"]]：notes/riscv-rvv-指令学习.md
+- [[程序优化方法总结|程序优化方法总结]]：notes/01-程序优化方法总结.md
+- [[程序性能优化之矩阵乘法(1)|程序性能优化之矩阵乘法(1)]]：notes/02-程序性能优化之矩阵乘法-1.md
+- [["riscv rvv 学习-1"|"riscv rvv 学习-1"]]：notes/03-riscv-rvv学习-1.md
 
 ### Articles
 
-- [['[gpt] Zero to Hero'|'[gpt] Zero to Hero']]：articles/Zero-To-Hero.md
+- [['Zero to Hero'|'Zero to Hero']]：articles/Zero-To-Hero.md
 
-### 📚 Quartz介绍
+## 📚 文档目录
 
 - [Quartz 教学文档](/docs/)

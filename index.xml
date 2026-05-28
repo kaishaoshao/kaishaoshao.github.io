@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+    <channel>
+      <title>kaishaoshao</title>
+      <link>https://kaishaoshao.github.io</link>
+      <description>Last 10 notes on kaishaoshao</description>
+      <generator>Quartz -- quartz.jzhao.xyz</generator>
+      <item>
+    <title>Canvas</title>
+    <link>https://kaishaoshao.github.io/docs/canvas.canvas</link>
+    <guid>https://kaishaoshao.github.io/docs/canvas.canvas</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>Base</title>
+    <link>https://kaishaoshao.github.io/docs/base.base</link>
+    <guid>https://kaishaoshao.github.io/docs/base.base</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>tags</title>
+    <link>https://kaishaoshao.github.io/docs/tags/</link>
+    <guid>https://kaishaoshao.github.io/docs/tags/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>component</title>
+    <link>https://kaishaoshao.github.io/tags/component</link>
+    <guid>https://kaishaoshao.github.io/tags/component</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>feature</title>
+    <link>https://kaishaoshao.github.io/tags/feature</link>
+    <guid>https://kaishaoshao.github.io/tags/feature</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>feature/transformer</title>
+    <link>https://kaishaoshao.github.io/tags/feature/transformer</link>
+    <guid>https://kaishaoshao.github.io/tags/feature/transformer</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>feature/emitter</title>
+    <link>https://kaishaoshao.github.io/tags/feature/emitter</link>
+    <guid>https://kaishaoshao.github.io/tags/feature/emitter</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>feature/filter</title>
+    <link>https://kaishaoshao.github.io/tags/feature/filter</link>
+    <guid>https://kaishaoshao.github.io/tags/feature/filter</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>plugin</title>
+    <link>https://kaishaoshao.github.io/tags/plugin</link>
+    <guid>https://kaishaoshao.github.io/tags/plugin</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item><item>
+    <title>plugin/emitter</title>
+    <link>https://kaishaoshao.github.io/tags/plugin/emitter</link>
+    <guid>https://kaishaoshao.github.io/tags/plugin/emitter</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 28 May 2026 02:54:51 GMT</pubDate>
+  </item>
+    </channel>
+  </rss>

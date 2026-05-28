@@ -35,10 +35,10 @@ git add .
 if git diff --cached --quiet; then
   echo "✅ 没有新的生成文件需要提交。"
 else
-  git commit -m "ci: deploy generated site from $(git rev-parse --short HEAD)"
-  # 配置机器人身份（CI 环境）
-  git config user.name "github-actions[bot]"
-  git config user.email "github-actions[bot]@users.noreply.github.com"
+# 设置提交者信息
+git config user.name "Wang shaokai"
+git config user.email "shaokai.wang@terapines.com"
+git commit -m "ci: deploy generated site from $(git rev-parse --short HEAD)" --author="Wang shaokai <shaokai.wang@terapines.com>"
   if [[ -n "${GH_TOKEN:-}" ]]; then
     git push --force-with-lease "https://${GH_TOKEN}@$(git remote get-url origin | sed -e 's|^https://||')" main
   else

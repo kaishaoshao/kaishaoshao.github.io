@@ -5,13 +5,22 @@ title: kaishaoshao 的数字花园 🌱
 
 ## 🪴 归档文章
 
-以下是当前已整理归档的笔记和文章：
 
-- [[程序性能优化之矩阵乘法-1|程序性能优化之矩阵乘法 - 1]]：探索矩阵乘法在不同层次的极致优化。
-- [[程序优化方法总结|程序优化方法总结]]：从算法到裸机架构的通用优化方法论。
-- [[riscv-rvv-指令学习|RISC-V Vector (RVV) 学习]]：对 RISC-V 向量扩展指令集以及 SIMD/SISD 概念的学习与记录。
-- [[Zero-To-Hero|Zero to Hero]]：Andre Karpathy 的 "Zero to Hero" 深度学习网课配套资源与链接。
+### Tutorials
 
-## 📚 文档目录
+- [[Hello Quartz|Hello Quartz]]：tutorials/hello-quartz.md
+- [[Hello Hexo|Hello Hexo]]：tutorials/hello-world.md
+
+### Notes
+
+- [[程序性能优化之矩阵乘法(1)|程序性能优化之矩阵乘法(1)]]：notes/程序性能优化之矩阵乘法-1.md
+- [[程序优化方法总结|程序优化方法总结]]：notes/程序优化方法总结.md
+- [["riscv rvv 学习"|"riscv rvv 学习"]]：notes/riscv-rvv-指令学习.md
+
+### Articles
+
+- [['[gpt] Zero to Hero'|'[gpt] Zero to Hero']]：articles/Zero-To-Hero.md
+
+### 📚 Quartz介绍
 
 - [Quartz 教学文档](/docs/)

@@ -55,4 +55,9 @@ Create a Pull Request to `main`. Our GitHub Actions workflow (see `.github/workf
 
 ---
 
+## 其他教程
+- [Hello Hexo](/tutorials/hello-world.md)
+
+---
+
 > **Tip:** Quartz uses Markdown files with front‑matter to generate pages. Feel free to explore the `content/` directory and experiment with different layouts.

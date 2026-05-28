@@ -1,0 +1,49 @@
+name: Sync Quartz Site to Main (Scheduled)
+
+# This workflow runs on a schedule (daily) and optionally can be triggered manually.
+# It checks out the `feat/quartz` branch, builds the site, and deploys the generated
+# `public` folder to the `main` branch using the existing deploy script.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 每天 UTC 03:00 (约合北京时间 11:00) 自动同步
+  workflow_dispatch:        # 手动触发
+
+jobs:
+  sync-to-main:
+    runs-on: ubuntu-latest
+    steps:
+      # 1️⃣ 检出 feat/quartz 分支（保留完整历史以便后续 push）
+      - name: Checkout feat/quartz
+        uses: actions/checkout@v3
+        with:
+          ref: feat/quartz
+          fetch-depth: 0
+
+      # 2️⃣ 设置 Node 环境（Quartz 推荐 Node 18+，这里使用 22）
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "22"
+
+      # 3️⃣ 升级 npm（Quartz 需要新版 npm）
+      - name: Upgrade npm
+        run: npm i -g npm@10.9.2
+
+      # 4️⃣ 安装项目依赖
+      - name: Install dependencies
+        run: npm ci
+
+      # 5️⃣ 构建 Quartz 站点 → `public/`
+      - name: Build Quartz site
+        run: npx quartz build
+
+      # 6️⃣ 确保部署脚本可执行
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
+
+      # 7️⃣ 部署到 main 分支（使用同一脚本）
+      - name: Deploy to main (using script)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: ./scripts/deploy.sh

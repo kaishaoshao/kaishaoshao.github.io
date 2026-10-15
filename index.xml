@@ -6,65 +6,65 @@
       <description>Last 10 notes on kaishaoshao</description>
       <generator>Quartz -- quartz.jzhao.xyz</generator>
       <item>
-    <title>Canvas</title>
-    <link>https://kaishaoshao.github.io/docs/canvas.canvas</link>
-    <guid>https://kaishaoshao.github.io/docs/canvas.canvas</guid>
+    <title>LLM</title>
+    <link>https://kaishaoshao.github.io/notes/llm/</link>
+    <guid>https://kaishaoshao.github.io/notes/llm/</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
-  </item><item>
-    <title>Base</title>
-    <link>https://kaishaoshao.github.io/docs/base.base</link>
-    <guid>https://kaishaoshao.github.io/docs/base.base</guid>
-    <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
-  </item><item>
-    <title>articles</title>
-    <link>https://kaishaoshao.github.io/articles/</link>
-    <guid>https://kaishaoshao.github.io/articles/</guid>
-    <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
-  </item><item>
-    <title>tags</title>
-    <link>https://kaishaoshao.github.io/docs/tags/</link>
-    <guid>https://kaishaoshao.github.io/docs/tags/</guid>
-    <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item><item>
     <title>notes</title>
     <link>https://kaishaoshao.github.io/notes/</link>
     <guid>https://kaishaoshao.github.io/notes/</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
+  </item><item>
+    <title>Opt</title>
+    <link>https://kaishaoshao.github.io/notes/opt/</link>
+    <guid>https://kaishaoshao.github.io/notes/opt/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
+  </item><item>
+    <title>Riscv</title>
+    <link>https://kaishaoshao.github.io/notes/riscv/</link>
+    <guid>https://kaishaoshao.github.io/notes/riscv/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
+  </item><item>
+    <title>skills</title>
+    <link>https://kaishaoshao.github.io/skills/</link>
+    <guid>https://kaishaoshao.github.io/skills/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item><item>
     <title>tutorials</title>
     <link>https://kaishaoshao.github.io/tutorials/</link>
     <guid>https://kaishaoshao.github.io/tutorials/</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item><item>
-    <title>component</title>
-    <link>https://kaishaoshao.github.io/tags/component</link>
-    <guid>https://kaishaoshao.github.io/tags/component</guid>
+    <title>llm</title>
+    <link>https://kaishaoshao.github.io/tags/llm</link>
+    <guid>https://kaishaoshao.github.io/tags/llm</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item><item>
-    <title>feature</title>
-    <link>https://kaishaoshao.github.io/tags/feature</link>
-    <guid>https://kaishaoshao.github.io/tags/feature</guid>
+    <title>深度学习</title>
+    <link>https://kaishaoshao.github.io/tags/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0</link>
+    <guid>https://kaishaoshao.github.io/tags/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item><item>
-    <title>feature/transformer</title>
-    <link>https://kaishaoshao.github.io/tags/feature/transformer</link>
-    <guid>https://kaishaoshao.github.io/tags/feature/transformer</guid>
+    <title>0.0.1</title>
+    <link>https://kaishaoshao.github.io/tags/0.0.1</link>
+    <guid>https://kaishaoshao.github.io/tags/0.0.1</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item><item>
-    <title>feature/emitter</title>
-    <link>https://kaishaoshao.github.io/tags/feature/emitter</link>
-    <guid>https://kaishaoshao.github.io/tags/feature/emitter</guid>
+    <title>compiler</title>
+    <link>https://kaishaoshao.github.io/tags/compiler</link>
+    <guid>https://kaishaoshao.github.io/tags/compiler</guid>
     <description><![CDATA[  ]]></description>
-    <pubDate>Thu, 28 May 2026 08:39:31 GMT</pubDate>
+    <pubDate>Thu, 15 Oct 2026 06:30:45 GMT</pubDate>
   </item>
     </channel>
   </rss>

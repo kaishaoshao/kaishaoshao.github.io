@@ -7,20 +7,19 @@ set -euo pipefail
 
 # 项目根目录（脚本所在目录的上级）
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SECTIONS=("tutorials" "notes" "articles")
+SECTIONS=("tutorials" "notes" "skills")
 
 # 固定头部（可自行编辑）
 HEADER='---
-title: kaishaoshao 的数字花园 🌱
+title: kaishaoshao的个人空间 🌱
 ---
-欢迎来到我的个人数字花园！这里主要记录我在计算机体系结构、编译器、高性能计算（HPC）以及机器学习底层的学习笔记与探索。
+欢迎来到我的个人空间！
+这里主要记录我在计算机体系结构、编译器、高性能计算、机器学习底层以及LLM大模型方面的学习笔记与探索。
 
 ## 🪴 归档文章'
 
-# 固定尾部
-FOOTER='## 📚 文档目录
-
-- [Quartz 教学文档](/docs/)'
+# 固定尾部（如有需要可补充）
+FOOTER=''
 
 # 生成每个子目录的列表
 generate_section() {
@@ -32,7 +31,7 @@ generate_section() {
   echo ""
   echo "### ${section^}"
   echo ""
-  find "${dir}" -maxdepth 1 -type f -name "*.md" ! -name "index.md" | sort | while read -r file; do
+  find "${dir}" -type f -name "*.md" ! -name "index.md" | sort | while read -r file; do
     # 读取 front‑matter 中的 title
     local title
     title=$(grep -m1 '^title:' "${file}" | sed -E 's/^title:[[:space:]]*//')
@@ -50,7 +49,9 @@ INDEX_FILE="${ROOT_DIR}/content/index.md"
   for sec in "${SECTIONS[@]}"; do
     generate_section "${sec}"
   done
-  printf "\n%s\n" "${FOOTER}"
+  if [[ -n "${FOOTER}" ]]; then
+    printf "\n%s\n" "${FOOTER}"
+  fi
 } > "${INDEX_FILE}"
 
 echo "✅ 已更新 ${INDEX_FILE}"

@@ -7,19 +7,24 @@ Welcome to **Quartz**! This is a quick introduction to the static site generator
 
 ## Quick Start
 
-### Install Quartz CLI
+### Install / Setup Quartz CLI
 
-```bash
-npm i -g @quartz-cli/quartz
-```
+Quartz 是一个基于源码与内容驱动的静态站点生成器，无需通过 npm 全局安装第三方包：
 
-### Create a new site
+1. **在已有 Quartz 仓库中使用**：
+   在本项目根目录下，直接使用 `npx quartz` 或全局链接命令即可：
+   ```bash
+   # 全局链接本地命令（可选，支持全局直接运行 quartz）
+   npm link
+   ```
 
-```bash
-mkdir my-quartz-site
-cd my-quartz-site
-npx quartz create
-```
+2. **从零新建 Quartz 站点**：
+   ```bash
+   git clone https://github.com/jackyzha0/quartz.git my-quartz-site
+   cd my-quartz-site
+   npm install
+   npx quartz create
+   ```
 
 ### Run the development server
 

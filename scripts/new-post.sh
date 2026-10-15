@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/new_post.sh – Quickly create a Markdown file with a unified Front‑matter.
 # Usage: ./scripts/new_post.sh <category> "<title>" [tag1 tag2 ...]
-#   <category> – one of the subfolders under content/ (e.g., tutorials, notes, articles)
+#   <category> – one of the subfolders under content/ (e.g., tutorials, notes, skills)
 #   "<title>"   – the page title (quoted if it contains spaces)
 #   [tags...]   – optional list of tags (space‑separated)
 

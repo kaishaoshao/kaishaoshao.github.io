@@ -47,17 +47,12 @@ export default (() => {
         <title>{title}</title>
         <meta charSet="utf-8" />
         {coreStylesheet && <link rel="preload" href={coreStylesheet} as="style" />}
-        {/* custom purple theme */}
-        <link rel="stylesheet" href="/static/css/custom.css" />
-        <style>{`
-            :root {
-              --accent: #6b5b95;
-              --accent-dark: #5a4a7d;
-              --accent-light: #9c86c0;
-            }
-            a, a:visited { color: var(--accent); }
-            a:hover { color: var(--accent-dark); }
-          `}</style>
+        {/* Theme palette pre-initialization to avoid flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{const p=localStorage.getItem("theme-palette")||"blue";document.documentElement.setAttribute("theme-palette",p)}catch(e){}`,
+          }}
+        />
         {coreScript && coreScript.contentType === "external" && (
           <link rel="preload" href={coreScript.src} as="script" />
         )}
@@ -118,6 +113,12 @@ export default (() => {
             return resource
           }
         })}
+        {/* Theme Palette Switcher Client Script */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){const P=[{id:"blue",name:"科技极简蓝",swatch:"swatch-blue"},{id:"green",name:"数字花园绿",swatch:"swatch-green"},{id:"purple",name:"赛博曜石紫",swatch:"swatch-purple"},{id:"catppuccin",name:"猫咪暖色 (Mocha)",swatch:"swatch-catppuccin"}];function getP(){try{return localStorage.getItem("theme-palette")||"blue"}catch(e){return"blue"}}function setP(id){document.documentElement.setAttribute("theme-palette",id);try{localStorage.setItem("theme-palette",id)}catch(e){}updateM();window.dispatchEvent(new CustomEvent("theme-palette-change",{detail:{palette:id}}))}function updateM(){const cur=getP();document.querySelectorAll(".palette-option-btn").forEach(b=>{if(b.getAttribute("data-palette")===cur){b.classList.add("active")}else{b.classList.remove("active")}})}function mount(){if(document.getElementById("theme-palette-wrapper")){updateM();return}const d=document.querySelector(".darkmode");if(!d||!d.parentElement||!d.parentElement.parentElement)return;const w=document.createElement("div");w.id="theme-palette-wrapper";w.className="palette-picker-wrapper";w.style.cssText="flex-grow:0;flex-shrink:1;flex-basis:auto;order:0;align-self:center;justify-self:center;";const btn=document.createElement("button");btn.className="palette-toggle-btn";btn.setAttribute("aria-label","切换主题配色 (Palette)");btn.setAttribute("title","切换主题配色");btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>';const m=document.createElement("div");m.className="palette-menu hidden";P.forEach(p=>{const opt=document.createElement("button");opt.type="button";opt.className="palette-option-btn";opt.setAttribute("data-palette",p.id);opt.innerHTML='<span class="palette-swatch '+p.swatch+'"></span><span class="palette-name">'+p.name+'</span><span class="palette-check">✓</span>';opt.addEventListener("click",function(e){e.stopPropagation();setP(p.id);m.classList.add("hidden")});m.appendChild(opt)});btn.addEventListener("click",function(e){e.stopPropagation();m.classList.toggle("hidden")});document.addEventListener("click",function(e){if(!w.contains(e.target)){m.classList.add("hidden")}});w.appendChild(btn);w.appendChild(m);d.parentElement.parentElement.insertBefore(w,d.parentElement.nextSibling);updateM()}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",mount)}else{mount()}document.addEventListener("nav",mount)})();`,
+          }}
+        />
       </head>
     )
   }

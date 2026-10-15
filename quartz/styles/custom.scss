@@ -1,3 +1,246 @@
 @use "./variables.scss" as *;
 
-// put your custom CSS here!
+/* ==========================================================================
+   Theme Palettes Definition (主题配色方案系统)
+   ========================================================================== */
+
+/* 1. 科技极简蓝 (Tech Slate Blue) - 默认 */
+:root[theme-palette="blue"],
+:root:not([theme-palette]) {
+  --light: #f8fafc;
+  --lightgray: #e2e8f0;
+  --gray: #94a3b8;
+  --darkgray: #334155;
+  --dark: #0f172a;
+  --secondary: #2563eb;
+  --tertiary: #3b82f6;
+  --highlight: rgba(37, 99, 235, 0.08);
+  --textHighlight: #fef08a88;
+}
+
+:root[theme-palette="blue"][saved-theme="dark"],
+:root:not([theme-palette])[saved-theme="dark"] {
+  --light: #0f172a;
+  --lightgray: #1e293b;
+  --gray: #64748b;
+  --darkgray: #cbd5e1;
+  --dark: #f8fafc;
+  --secondary: #60a5fa;
+  --tertiary: #93c5fd;
+  --highlight: rgba(96, 165, 250, 0.15);
+  --textHighlight: #eab30844;
+}
+
+/* 2. 数字花园 / 翡翠绿 (Forest Garden Green 🌱) */
+:root[theme-palette="green"] {
+  --light: #faf8f5;
+  --lightgray: #e7e5e0;
+  --gray: #a39e93;
+  --darkgray: #363a37;
+  --dark: #1c2420;
+  --secondary: #2d6a4f;
+  --tertiary: #52b788;
+  --highlight: rgba(45, 106, 79, 0.1);
+  --textHighlight: #ffe06688;
+}
+
+:root[theme-palette="green"][saved-theme="dark"] {
+  --light: #121815;
+  --lightgray: #222c27;
+  --gray: #5a6b62;
+  --darkgray: #d3ded8;
+  --dark: #f0fdf4;
+  --secondary: #52b788;
+  --tertiary: #74c69d;
+  --highlight: rgba(82, 183, 136, 0.15);
+  --textHighlight: #10b98133;
+}
+
+/* 3. 赛博黑曜石紫 (Cyber Violet Pro 🟣) */
+:root[theme-palette="purple"] {
+  --light: #faf5ff;
+  --lightgray: #ede9fe;
+  --gray: #a78bfa;
+  --darkgray: #2e1065;
+  --dark: #1e1b4b;
+  --secondary: #7c3aed;
+  --tertiary: #9333ea;
+  --highlight: rgba(124, 58, 237, 0.1);
+  --textHighlight: #e9d5ff88;
+}
+
+:root[theme-palette="purple"][saved-theme="dark"] {
+  --light: #0f0e17;
+  --lightgray: #232035;
+  --gray: #6c668a;
+  --darkgray: #e4e1f0;
+  --dark: #ffffff;
+  --secondary: #a78bfa;
+  --tertiary: #c4b5fd;
+  --highlight: rgba(167, 139, 250, 0.18);
+  --textHighlight: #a855f744;
+}
+
+/* 4. 猫咪暖色 (Catppuccin Mocha 🐱) */
+:root[theme-palette="catppuccin"] {
+  --light: #eff1f5;
+  --lightgray: #dce0e8;
+  --gray: #9ca0b0;
+  --darkgray: #4c4f69;
+  --dark: #20202a;
+  --secondary: #1e66f5;
+  --tertiary: #7287fd;
+  --highlight: rgba(30, 102, 245, 0.1);
+  --textHighlight: #df8e1d44;
+}
+
+:root[theme-palette="catppuccin"][saved-theme="dark"] {
+  --light: #1e1e2e;
+  --lightgray: #313244;
+  --gray: #6c7086;
+  --darkgray: #cdd6f4;
+  --dark: #cdd6f4;
+  --secondary: #89b4fa;
+  --tertiary: #b4befe;
+  --highlight: rgba(137, 180, 250, 0.15);
+  --textHighlight: #f9e2af44;
+}
+
+/* ==========================================================================
+   Theme Palette Switcher Component UI
+   ========================================================================== */
+
+.palette-picker-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.palette-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--darkgray);
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--lightgray);
+    color: var(--dark);
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    fill: none;
+    transition: transform 0.2s ease;
+  }
+
+  &:hover svg {
+    transform: rotate(20deg);
+  }
+}
+
+.palette-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background-color: var(--light);
+  border: 1px solid var(--lightgray);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  min-width: 175px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: paletteMenuFade 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+
+  &.hidden {
+    display: none !important;
+  }
+}
+
+@keyframes paletteMenuFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.palette-option-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--darkgray);
+  font-size: 0.85rem;
+  font-family: var(--bodyFont);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background-color: var(--lightgray);
+    color: var(--dark);
+  }
+
+  &.active {
+    background-color: var(--highlight);
+    color: var(--secondary);
+    font-weight: 600;
+  }
+
+  .palette-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+  }
+
+  .palette-name {
+    flex-grow: 1;
+  }
+
+  .palette-check {
+    font-size: 0.8rem;
+    color: var(--secondary);
+    opacity: 0;
+  }
+
+  &.active .palette-check {
+    opacity: 1;
+  }
+}
+
+/* Swatch Color Badges */
+.palette-swatch.swatch-blue {
+  background: linear-gradient(135deg, #2563eb 50%, #60a5fa 50%);
+}
+.palette-swatch.swatch-green {
+  background: linear-gradient(135deg, #2d6a4f 50%, #52b788 50%);
+}
+.palette-swatch.swatch-purple {
+  background: linear-gradient(135deg, #7c3aed 50%, #a78bfa 50%);
+}
+.palette-swatch.swatch-catppuccin {
+  background: linear-gradient(135deg, #1e66f5 50%, #89b4fa 50%);
+}

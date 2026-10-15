@@ -1,7 +1,7 @@
 ---
 title: 'Zero to Hero'
 date: 2026-03-20 10:39:18
-tags:
+tags: [LLM, 深度学习]
 ---
 参考链接
 [Zero to Hero](https://karpathy.ai/zero-to-hero.html)

@@ -1,12 +1,99 @@
 @use "./variables.scss" as *;
 
 /* ==========================================================================
-   Theme Palettes Definition (主题配色方案系统)
+   1. Theme Palettes Definition (多主题配色方案系统)
+   Default: "alan" — Warm Parchment & Retro Ink (inspired by whereisalan.dev)
    ========================================================================== */
 
-/* 1. 科技极简蓝 (Tech Slate Blue) - 默认 */
-:root[theme-palette="blue"],
+:root {
+  --displayFont: "Smythe", "Source Serif 4", "PingFang SC", Georgia, serif;
+  --editorialFont:
+    "Source Serif 4", "Noto Serif SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    Georgia, serif;
+  --uiFont: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  /* Default semantic fallbacks (overridden per palette below) */
+  --alan-surface-card: var(--lightgray);
+  --alan-surface-active: var(--secondary);
+  --alan-code-bg: color-mix(in srgb, var(--lightgray) 65%, var(--light));
+  --alan-code-caption-bg: var(--lightgray);
+  --alan-code-caption-text: var(--darkgray);
+  --alan-inline-code-bg: var(--lightgray);
+  --alan-inline-code-text: var(--dark);
+  --alan-border: color-mix(in srgb, var(--gray) 32%, transparent);
+  --alan-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --alan-hole-shadow: inset 0 3px 4px rgba(0, 0, 0, 0.24);
+  --alan-chip: rgba(0, 0, 0, 0.06);
+  --alan-scrollbar-thumb: var(--secondary);
+  --alan-hero-glow: color-mix(in srgb, var(--secondary) 14%, transparent);
+  --alan-star-color: var(--tertiary);
+}
+
+:root[saved-theme="dark"] {
+  --alan-chip: rgba(255, 255, 255, 0.08);
+  --alan-card-shadow: 0 6px 16px rgba(0, 0, 0, 0.36);
+  --alan-hole-shadow: inset 0 3px 4px rgba(0, 0, 0, 0.55);
+}
+
+/* 0. 羊皮暖纸 (WhereIsAlan Warm Parchment ✨) - 默认 */
+:root[theme-palette="alan"],
 :root:not([theme-palette]) {
+  --light: #fef8ea;
+  --lightgray: #ebe3be;
+  --gray: #8b7f6b;
+  --darkgray: #454d43;
+  --dark: #1d1a16;
+  --secondary: #fe3e00;
+  --tertiary: #c36e1c;
+  --highlight: rgba(244, 117, 73, 0.14);
+  --textHighlight: #ffe86688;
+
+  --alan-surface-card: #ebe3be;
+  --alan-surface-active: #f47549;
+  --alan-code-bg: #f6e6b5;
+  --alan-code-caption-bg: #ead7a0;
+  --alan-code-caption-text: #5c4a1e;
+  --alan-inline-code-bg: #ffe866;
+  --alan-inline-code-text: #3a2b14;
+  --alan-border: #d8cfa8;
+  --alan-card-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+  --alan-hole-shadow: inset 0 3px 4px rgba(0, 0, 0, 0.28);
+  --alan-chip: rgba(0, 0, 0, 0.065);
+  --alan-scrollbar-thumb: #ff784a;
+  --alan-hero-glow: rgba(244, 117, 73, 0.16);
+  --alan-star-color: #c36e1c;
+}
+
+:root[theme-palette="alan"][saved-theme="dark"],
+:root:not([theme-palette])[saved-theme="dark"] {
+  --light: #171513;
+  --lightgray: #2b2520;
+  --gray: #b9aa9b;
+  --darkgray: #ead9c5;
+  --dark: #f7ece0;
+  --secondary: #e07a5f;
+  --tertiary: #f0b66a;
+  --highlight: rgba(224, 122, 95, 0.16);
+  --textHighlight: #d9974b44;
+
+  --alan-surface-card: #211d19;
+  --alan-surface-active: #e07a5f;
+  --alan-code-bg: #211d19;
+  --alan-code-caption-bg: #2d2721;
+  --alan-code-caption-text: #c9b8a3;
+  --alan-inline-code-bg: #332b25;
+  --alan-inline-code-text: #ead9c5;
+  --alan-border: #3a322b;
+  --alan-card-shadow: 0 6px 16px rgba(0, 0, 0, 0.42);
+  --alan-hole-shadow: inset 0 3px 4px rgba(0, 0, 0, 0.55);
+  --alan-chip: rgba(255, 255, 255, 0.08);
+  --alan-scrollbar-thumb: #e07a5f;
+  --alan-hero-glow: rgba(224, 122, 95, 0.14);
+  --alan-star-color: #f0b66a;
+}
+
+/* 1. 科技极简蓝 (Tech Slate Blue) */
+:root[theme-palette="blue"] {
   --light: #f8fafc;
   --lightgray: #e2e8f0;
   --gray: #94a3b8;
@@ -18,8 +105,7 @@
   --textHighlight: #fef08a88;
 }
 
-:root[theme-palette="blue"][saved-theme="dark"],
-:root:not([theme-palette])[saved-theme="dark"] {
+:root[theme-palette="blue"][saved-theme="dark"] {
   --light: #0f172a;
   --lightgray: #1e293b;
   --gray: #64748b;
@@ -107,7 +193,848 @@
 }
 
 /* ==========================================================================
-   Theme Palette Switcher Component UI
+   2. Custom Scrollbar & Top Reading Progress (定制滚动条 & 顶部阅读进度条)
+   ========================================================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--alan-scrollbar-thumb) var(--light);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--alan-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary);
+}
+
+#alan-reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 9998;
+  pointer-events: none;
+  background: transparent;
+
+  .alan-progress-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--secondary), var(--tertiary));
+    transition: width 0.08s linear;
+  }
+}
+
+/* ==========================================================================
+   3. Global Typography & Editorial Ergonomics (排版与阅读舒适度)
+   ========================================================================== */
+
+body {
+  font-family: var(--uiFont);
+  background-color: var(--light);
+  color: var(--darkgray);
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+/* Subtle warm parchment texture on Alan light mode */
+:root[theme-palette="alan"]:not([saved-theme="dark"]) body,
+:root:not([theme-palette]):not([saved-theme="dark"]) body {
+  background-image: radial-gradient(rgba(195, 110, 28, 0.06) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+article {
+  font-family: var(--editorialFont);
+  font-size: 1.05rem;
+  line-height: 1.78;
+
+  .markdown-preview-view,
+  .markdown-rendered {
+    font-family: var(--editorialFont);
+  }
+
+  p,
+  li {
+    line-height: 1.78;
+  }
+
+  /* Comfortable ~70-char prose width; code/tables/cards retain full column width */
+  > .markdown-preview-view > p,
+  > .markdown-preview-view > ul,
+  > .markdown-preview-view > ol,
+  > .markdown-preview-view > blockquote,
+  > .markdown-preview-view > h1,
+  > .markdown-preview-view > h2,
+  > .markdown-preview-view > h3,
+  > .markdown-preview-view > h4,
+  > p,
+  > ul,
+  > ol,
+  > blockquote,
+  > h1,
+  > h2,
+  > h3,
+  > h4 {
+    max-width: 44rem;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--editorialFont);
+    color: var(--dark);
+    letter-spacing: -0.01em;
+  }
+
+  h2 {
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--alan-border);
+  }
+}
+
+.article-title {
+  font-family: var(--editorialFont);
+  font-size: clamp(1.9rem, 3.2vw, 2.5rem);
+  line-height: 1.2;
+  color: var(--dark);
+  letter-spacing: -0.015em;
+}
+
+.content-meta {
+  font-family: var(--uiFont);
+  font-size: 0.85rem;
+  color: var(--gray);
+}
+
+a {
+  color: var(--tertiary);
+  transition: color 0.18s ease;
+
+  &:hover {
+    color: var(--secondary);
+  }
+
+  &.internal {
+    background-color: var(--highlight);
+    color: var(--secondary);
+    border-radius: 5px;
+    padding: 0.05rem 0.28rem;
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--secondary) 18%, transparent);
+    }
+
+    &.tag-link {
+      border-radius: 999px;
+      padding: 0.12rem 0.6rem;
+      font-size: 0.82rem;
+      background-color: var(--alan-chip);
+      color: var(--tertiary);
+
+      &:hover {
+        background-color: var(--alan-surface-active);
+        color: #ffffff;
+      }
+    }
+  }
+}
+
+/* ==========================================================================
+   4. Code Blocks, Inline Code, Blockquotes, Callouts & Tables (代码块与元素)
+   ========================================================================== */
+
+:not(pre) > code {
+  background-color: var(--alan-inline-code-bg);
+  color: var(--alan-inline-code-text);
+  border-radius: 4px;
+  padding: 0.12em 0.42em;
+  font-size: 0.88em;
+  font-family: var(--codeFont);
+}
+
+figure[data-rehype-pretty-code-figure] {
+  margin: 1.25rem 0;
+
+  > [data-rehype-pretty-code-title] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.45rem 1.1rem;
+    border-radius: 8px 8px 0 0;
+    background-color: var(--alan-code-caption-bg);
+    color: var(--alan-code-caption-text);
+    border: 1px solid var(--alan-border);
+    border-bottom: none;
+    margin-bottom: 0;
+    font-family: var(--codeFont);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+  }
+
+  > [data-rehype-pretty-code-title] + pre {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    margin-top: 0;
+  }
+}
+
+pre {
+  background-color: var(--alan-code-bg);
+  border: 1px solid var(--alan-border);
+  border-radius: 8px;
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.08);
+  padding: 0.45rem 0.65rem;
+  /* Soft horizontal scroll-edge indicator shadows (adapted from whereisalan.dev) */
+  background-image:
+    linear-gradient(to right, var(--alan-code-bg) 30%, rgba(0, 0, 0, 0)),
+    linear-gradient(to left, var(--alan-code-bg) 30%, rgba(0, 0, 0, 0)),
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0)),
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+  background-position: left center, right center, left center, right center;
+  background-size: 36px 100%, 36px 100%, 14px 100%, 14px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+
+  > code,
+  > code[data-theme*=" "] {
+    background-color: transparent !important;
+  }
+}
+
+:root[saved-theme="dark"] pre {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+blockquote {
+  margin: 1.25rem 0;
+  padding: 0.75rem 1.15rem;
+  border-left: 3px solid var(--secondary);
+  background-color: color-mix(in srgb, var(--alan-surface-card) 42%, transparent);
+  border-radius: 0 10px 10px 0;
+
+  > p:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.callout {
+  border-radius: 10px;
+  border-width: 1px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+  &[data-callout="note"],
+  &[data-callout="info"] {
+    --color: var(--tertiary);
+    --border: color-mix(in srgb, var(--tertiary) 45%, transparent);
+    --bg: color-mix(in srgb, var(--alan-surface-card) 55%, transparent);
+  }
+}
+
+.table-container {
+  margin: 1.25rem 0;
+  border: 1px solid var(--alan-border);
+  border-radius: 10px;
+  background-color: color-mix(in srgb, var(--alan-surface-card) 25%, var(--light));
+
+  > table {
+    margin: 0;
+    width: 100%;
+
+    thead {
+      background-color: var(--alan-surface-card);
+    }
+
+    th {
+      border-bottom: 1.5px solid var(--alan-border);
+      font-family: var(--uiFont);
+      font-size: 0.9rem;
+      color: var(--dark);
+    }
+
+    td,
+    th {
+      padding: 0.55rem 0.85rem;
+    }
+
+    tr {
+      border-bottom: 1px solid var(--alan-border);
+    }
+  }
+}
+
+.note-properties.metadata-container {
+  background-color: color-mix(in srgb, var(--alan-surface-card) 48%, transparent);
+  border: 1px solid var(--alan-border);
+  border-radius: 10px;
+  padding: 0.45rem 0.85rem;
+  margin: 0.65rem 0;
+  font-family: var(--uiFont);
+}
+
+/* ==========================================================================
+   5. Sidebars, Explorer, Search, Graph, TOC & Footer (侧栏与功能组件)
+   ========================================================================== */
+
+.page > #quartz-body {
+  .sidebar.left {
+    @media all and ($desktop) {
+      border-right: 1px solid var(--alan-border);
+      padding-right: 1.5rem;
+    }
+  }
+
+  .sidebar.right {
+    @media all and ($desktop) {
+      border-left: 1px solid var(--alan-border);
+      padding-left: 1.5rem;
+    }
+  }
+
+  footer {
+    border-top: 1px solid var(--alan-border);
+    padding-top: 1.25rem;
+    margin-top: 2.5rem;
+    font-family: var(--uiFont);
+    font-size: 0.85rem;
+    color: var(--gray);
+  }
+}
+
+h2.page-title {
+  font-family: var(--displayFont);
+  font-size: 2.15rem;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  margin: 0;
+
+  a {
+    color: var(--dark);
+    font-weight: 400;
+
+    &:hover {
+      color: var(--secondary);
+    }
+  }
+}
+
+.search > .search-button {
+  background-color: var(--alan-surface-card);
+  border: 1px solid var(--alan-border);
+  border-radius: 10px;
+  padding: 0.4rem 0.7rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover {
+    border-color: var(--secondary);
+  }
+}
+
+.search-container > .search-space {
+  background-color: var(--light);
+  border: 1px solid var(--alan-border);
+  border-radius: 14px;
+  box-shadow: var(--alan-card-shadow);
+}
+
+button.darkmode,
+button.readermode {
+  border-radius: 8px;
+  transition: background-color 0.18s ease;
+
+  &:hover {
+    background-color: var(--alan-surface-card);
+  }
+}
+
+.explorer {
+  font-family: var(--uiFont);
+
+  a.active {
+    color: var(--secondary);
+    font-weight: 600;
+  }
+
+  a:hover {
+    color: var(--secondary);
+  }
+}
+
+.graph > .graph-outer {
+  background-color: var(--alan-surface-card);
+  border: 1px solid var(--alan-border);
+  border-radius: 16px;
+  box-shadow: var(--alan-card-shadow);
+  overflow: hidden;
+}
+
+.toc {
+  font-family: var(--uiFont);
+
+  ul.toc-content {
+    border-left: 1px solid var(--alan-border);
+    padding-left: 0.75rem;
+
+    a {
+      color: var(--gray);
+      font-weight: 400;
+
+      &.in-view,
+      &:hover {
+        color: var(--secondary);
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+.breadcrumb-container {
+  font-family: var(--uiFont);
+  font-size: 0.85rem;
+  color: var(--gray);
+
+  a:hover {
+    color: var(--secondary);
+  }
+}
+
+.popover > .popover-inner {
+  border-radius: 12px;
+  border: 1px solid var(--alan-border);
+  box-shadow: var(--alan-card-shadow);
+}
+
+/* Folder & Tag listing cards (inspired by whereisalan.dev/blog/) */
+ul.section-ul {
+  list-style: none;
+  padding-left: 0;
+
+  > li.section-li {
+    background-color: var(--alan-surface-card);
+    border: 1px solid var(--alan-border);
+    border-radius: 14px;
+    padding: 0.9rem 1.2rem;
+    margin-bottom: 0.9rem;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease;
+
+    &:hover {
+      transform: translateY(-2px);
+      border-color: var(--secondary);
+      box-shadow: var(--alan-card-shadow);
+    }
+  }
+}
+
+/* ==========================================================================
+   6. Homepage #intro Hero & Punch-Hole Card Deck (首页风格重构)
+   ========================================================================== */
+
+body[data-slug="index"].alan-enhanced {
+  .page-header {
+    display: none;
+  }
+
+  article .alan-moved-intro {
+    display: none;
+  }
+}
+
+@keyframes alan-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes alan-bob {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+#alan-intro-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.38fr) minmax(190px, 0.82fr);
+  gap: 1.5rem;
+  align-items: center;
+  margin: 1.8rem 0 2.4rem;
+  padding: 2.2rem 2rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 85% 22%, var(--alan-hero-glow), transparent 58%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--alan-surface-card) 68%, var(--light)),
+      var(--light)
+    );
+  border: 1px solid var(--alan-border);
+  box-shadow: var(--alan-card-shadow);
+  overflow: hidden;
+
+  @media all and ($mobile) {
+    grid-template-columns: 1fr;
+    padding: 1.65rem 1.35rem;
+    margin-top: 0.9rem;
+  }
+}
+
+.alan-intro-left {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.alan-intro-salutation {
+  font-family: var(--displayFont);
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--darkgray);
+  letter-spacing: 0.03em;
+}
+
+.alan-intro-name {
+  font-family: var(--displayFont);
+  font-size: clamp(3rem, 5.4vw, 4.3rem);
+  line-height: 0.94;
+  font-weight: 400;
+  margin: 0;
+  color: var(--secondary);
+  letter-spacing: 0.01em;
+}
+
+.alan-intro-tagline {
+  font-family: var(--displayFont);
+  font-size: clamp(1.55rem, 2.6vw, 2.1rem);
+  line-height: 1.1;
+  color: var(--tertiary);
+  margin-bottom: 0.35rem;
+}
+
+.alan-intro-brief {
+  margin: 0.35rem 0 0.5rem;
+  font-family: var(--editorialFont);
+  font-size: 1.03rem;
+  line-height: 1.7;
+  color: var(--darkgray);
+  max-width: 36rem;
+}
+
+.alan-intro-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.2rem 0 0.75rem;
+}
+
+.alan-topic-chip {
+  font-family: var(--codeFont);
+  font-size: 0.74rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background-color: var(--alan-chip);
+  color: var(--darkgray);
+  border: 1px solid var(--alan-border);
+}
+
+.alan-intro-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.alan-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.3rem;
+  border-radius: 25px;
+  font-family: var(--uiFont);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    transform 0.18s ease,
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.alan-pill-primary {
+  background-color: var(--alan-surface-active);
+  color: #ffffff !important;
+
+  &:hover {
+    background-color: var(--secondary);
+    color: #ffffff !important;
+  }
+}
+
+.alan-pill-secondary {
+  background-color: var(--alan-surface-card);
+  color: var(--dark) !important;
+  border: 1px solid var(--alan-border);
+
+  &:hover {
+    border-color: var(--secondary);
+    color: var(--secondary) !important;
+  }
+}
+
+.alan-intro-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 185px;
+
+  @media all and ($mobile) {
+    min-height: 145px;
+  }
+}
+
+#alan-intro-star {
+  width: 175px;
+  height: 175px;
+  color: var(--alan-star-color);
+  transition: transform 0.12s linear;
+  will-change: transform;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    animation: alan-spin-slow 46s linear infinite;
+  }
+}
+
+#alan-intro-emblem {
+  position: absolute;
+  bottom: 8px;
+  animation: alan-bob 4s ease-in-out infinite;
+}
+
+.alan-emblem-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  background-color: var(--alan-surface-card);
+  border: 1px solid var(--alan-border);
+  box-shadow: var(--alan-card-shadow);
+  font-family: var(--codeFont);
+  font-size: 0.74rem;
+  color: var(--dark);
+  white-space: nowrap;
+}
+
+.alan-emblem-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--secondary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 25%, transparent);
+}
+
+/* Section heading above punch-hole card deck */
+article h2.alan-section-heading {
+  max-width: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-family: var(--displayFont);
+  font-size: 2.3rem;
+  line-height: 1.1;
+  font-weight: 400;
+  color: var(--dark);
+  border-bottom: none;
+  margin: 0.8rem 0 1.4rem;
+  letter-spacing: 0.03em;
+
+  &::before,
+  &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--alan-border);
+  }
+}
+
+/* Punch-Hole Cards Deck (inspired by whereisalan.dev .card & .bh-card) */
+.alan-card-deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.45rem;
+  width: 100%;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.alan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--alan-surface-card);
+  border: 1px solid var(--alan-border);
+  border-radius: 16px;
+  padding: 2.5rem 1.35rem 1.35rem;
+  box-shadow: var(--alan-card-shadow);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+
+  /* Signature top-center punch hole */
+  &::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    width: 1.12rem;
+    height: 1.12rem;
+    margin-left: -0.56rem;
+    border-radius: 50%;
+    background-color: var(--light);
+    box-shadow: var(--alan-hole-shadow);
+  }
+
+  &:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--secondary) 45%, var(--alan-border));
+  }
+}
+
+.alan-card-kicker {
+  font-family: var(--uiFont);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--tertiary);
+  margin-bottom: 0.25rem;
+}
+
+.alan-card h3.alan-card-title {
+  font-family: var(--displayFont);
+  font-size: 2.05rem;
+  line-height: 1.1;
+  font-weight: 400;
+  text-align: center;
+  color: var(--dark);
+  margin: 0 0 0.85rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px dashed var(--alan-border);
+  max-width: none;
+
+  > a[role="anchor"] {
+    display: none;
+  }
+}
+
+.alan-card ul.alan-card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  max-width: none;
+  flex: 1;
+
+  li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.18rem;
+    padding: 0.48rem 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--alan-border) 55%, transparent);
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    a {
+      font-family: var(--editorialFont);
+      font-size: 0.98rem;
+      font-weight: 600;
+      background-color: transparent;
+      padding: 0;
+      color: var(--dark);
+      line-height: 1.38;
+
+      &:hover {
+        color: var(--secondary);
+      }
+    }
+  }
+}
+
+.alan-item-path {
+  font-family: var(--codeFont);
+  font-size: 0.72rem;
+  color: var(--gray);
+  word-break: break-all;
+}
+
+.alan-card-footer {
+  margin-top: auto;
+  padding-top: 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.alan-card-cta {
+  display: inline-block;
+  padding: 0.42rem 1.05rem;
+  border-radius: 25px;
+  background-color: var(--alan-surface-active);
+  color: #ffffff !important;
+  font-family: var(--uiFont);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color 0.2s ease,
+    transform 0.18s ease;
+
+  &:hover {
+    background-color: var(--secondary);
+    color: #ffffff !important;
+    transform: translateY(-1px);
+  }
+}
+
+/* ==========================================================================
+   7. Theme Palette Switcher Component UI (实时调色盘下拉面板)
    ========================================================================== */
 
 .palette-picker-wrapper {
@@ -128,12 +1055,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: var(--lightgray);
-    color: var(--dark);
+    background-color: var(--alan-surface-card);
+    color: var(--secondary);
   }
 
   svg {
@@ -152,13 +1079,14 @@
 .palette-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
+  right: 0;
+  left: auto;
   background-color: var(--light);
-  border: 1px solid var(--lightgray);
-  border-radius: 10px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--alan-border);
+  border-radius: 12px;
+  box-shadow: var(--alan-card-shadow);
   padding: 6px;
-  min-width: 175px;
+  min-width: 185px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -187,18 +1115,20 @@
   gap: 10px;
   width: 100%;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: var(--darkgray);
   font-size: 0.85rem;
-  font-family: var(--bodyFont);
+  font-family: var(--uiFont);
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 
   &:hover {
-    background-color: var(--lightgray);
+    background-color: var(--alan-surface-card);
     color: var(--dark);
   }
 
@@ -212,7 +1142,7 @@
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    border: 1.5px solid rgba(0, 0, 0, 0.1);
+    border: 1.5px solid rgba(0, 0, 0, 0.15);
     flex-shrink: 0;
   }
 
@@ -232,6 +1162,9 @@
 }
 
 /* Swatch Color Badges */
+.palette-swatch.swatch-alan {
+  background: linear-gradient(135deg, #fe3e00 50%, #ebe3be 50%);
+}
 .palette-swatch.swatch-blue {
   background: linear-gradient(135deg, #2563eb 50%, #60a5fa 50%);
 }

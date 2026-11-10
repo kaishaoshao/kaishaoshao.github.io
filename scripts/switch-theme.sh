@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/switch-theme.sh - 方便地一键切换 Quartz 静态构建的默认主题配色
-# 用法: ./scripts/switch-theme.sh [blue|green|purple|catppuccin]
+# 用法: ./scripts/switch-theme.sh [alan|blue|green|purple|catppuccin]
 
 set -euo pipefail
 
@@ -11,16 +11,40 @@ THEME="${1:-}"
 
 if [[ -z "${THEME}" ]]; then
   echo "🎨 请指定要切换的主题配色名称："
-  echo "  1) blue       - 科技极简蓝 (Tech Slate Blue，高清晰度推荐)"
-  echo "  2) green      - 数字花园绿 (Forest Green 🌱，护眼自然风)"
-  echo "  3) purple     - 赛博黑曜石紫 (Cyber Violet Pro 🟣，优化版紫色)"
-  echo "  4) catppuccin - 猫咪暖色 (Catppuccin Mocha 🐱，经典柔和风)"
+  echo "  1) alan       - 复古羊皮暖纸 (WhereIsAlan Warm Parchment ✨，默认推荐)"
+  echo "  2) blue       - 科技极简蓝 (Tech Slate Blue)"
+  echo "  3) green      - 数字花园绿 (Forest Green 🌱，护眼自然风)"
+  echo "  4) purple     - 赛博黑曜石紫 (Cyber Violet Pro 🟣，优化版紫色)"
+  echo "  5) catppuccin - 猫咪暖色 (Catppuccin Mocha 🐱，经典柔和风)"
   echo ""
-  echo "用法示例: $0 blue"
+  echo "用法示例: $0 alan"
   exit 1
 fi
 
 case "${THEME}" in
+  alan)
+    LIGHT_LIGHT="#FEF8EA"
+    LIGHT_LIGHTGRAY="#EBE3BE"
+    LIGHT_GRAY="#8b7f6b"
+    LIGHT_DARKGRAY="#454d43"
+    LIGHT_DARK="#1d1a16"
+    LIGHT_SECONDARY="#FE3E00"
+    LIGHT_TERTIARY="#C36E1C"
+    LIGHT_HIGHLIGHT="rgba(244, 117, 73, 0.14)"
+    LIGHT_TEXT_HIGHLIGHT="#ffe86688"
+
+    DARK_LIGHT="#171513"
+    DARK_LIGHTGRAY="#2b2520"
+    DARK_GRAY="#b9aa9b"
+    DARK_DARKGRAY="#ead9c5"
+    DARK_DARK="#f7ece0"
+    DARK_SECONDARY="#e07a5f"
+    DARK_TERTIARY="#f0b66a"
+    DARK_HIGHLIGHT="rgba(224, 122, 95, 0.16)"
+    DARK_TEXT_HIGHLIGHT="#d9974b44"
+    THEME_NAME="复古羊皮暖纸 (WhereIsAlan Warm Parchment ✨)"
+    ;;
+
   blue)
     LIGHT_LIGHT="#f8fafc"
     LIGHT_LIGHTGRAY="#e2e8f0"
@@ -114,7 +138,7 @@ case "${THEME}" in
     ;;
 
   *)
-    echo "❌ 未知主题: '${THEME}'。支持的值: blue, green, purple, catppuccin"
+    echo "❌ 未知主题: '${THEME}'。支持的值: alan, blue, green, purple, catppuccin"
     exit 1
     ;;
 esac

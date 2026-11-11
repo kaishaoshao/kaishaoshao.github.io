@@ -808,7 +808,6 @@ ul.section-ul {
       border-color 0.18s ease;
 
     &:hover {
-      transform: translateY(-2px);
       border-color: var(--secondary);
       box-shadow: var(--alan-card-shadow);
     }
@@ -833,13 +832,13 @@ ul.section-ul {
   }
 }
 
-@keyframes alan-bob {
+@keyframes alan-glide {
   0%,
   100% {
-    transform: translateY(0px);
+    transform: translateX(-16px);
   }
   50% {
-    transform: translateY(-9px);
+    transform: translateX(16px);
   }
 }
 
@@ -1167,7 +1166,7 @@ body[data-slug="index"] {
 #alan-intro-emblem {
   position: absolute;
   bottom: 12px;
-  animation: alan-bob 4s ease-in-out infinite;
+  animation: alan-glide 6s ease-in-out infinite;
 }
 
 .alan-emblem-card {
@@ -1208,13 +1207,10 @@ body[data-slug="index"] {
   text-decoration: none;
   padding: 0.35rem 0.85rem;
   border-radius: 999px;
-  transition:
-    color 0.2s ease,
-    transform 0.2s ease;
+  transition: color 0.2s ease;
 
   &:hover {
     color: var(--secondary);
-    transform: translate(-50%, 2px);
   }
 }
 
@@ -1241,28 +1237,124 @@ body[data-slug="index"] {
   margin: 0 auto 2.5rem !important;
 }
 
-/* Section 2: #about — Horizontal Punch-Hole Cards (inspired by whereisalan.dev/#about) */
+/* Section 2: #about — Horizontal Swipe Carousel Punch-Hole Cards (inspired by whereisalan.dev/#about) */
 #alan-about {
-  max-width: 1080px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 5.5rem 1.5rem 3.5rem;
+  padding: 5.5rem 1rem 3.5rem;
 
   .alan-section-title {
-    margin-bottom: 2.5rem !important;
+    margin-bottom: 2rem !important;
+  }
+}
+
+.alan-about-carousel {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.alan-carousel-btn,
+.alan-carousel-prev,
+.alan-carousel-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--alan-border);
+  background: color-mix(in srgb, var(--alan-surface-card) 92%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--dark);
+  font-family: var(--uiFont);
+  font-size: 1.4rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--alan-card-shadow);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--secondary);
+    color: var(--secondary);
+    background: var(--alan-surface-card);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  @media all and ($mobile) {
+    width: 2.15rem;
+    height: 2.15rem;
+    font-size: 1.15rem;
+  }
+}
+
+.alan-carousel-prev {
+  left: 0.45rem;
+
+  @media all and ($mobile) {
+    left: 0.15rem;
+  }
+}
+
+.alan-carousel-next {
+  right: 0.45rem;
+
+  @media all and ($mobile) {
+    right: 0.15rem;
   }
 }
 
 .alan-about-deck {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2.5rem;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 1.75rem;
   width: 100%;
+  padding: 1rem clamp(2.5rem, 11vw, 9rem);
+  box-sizing: border-box;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  cursor: grab;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  &.is-dragging {
+    scroll-behavior: auto;
+    scroll-snap-type: none;
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  @media all and ($mobile) {
+    gap: 1rem;
+    padding: 0.75rem clamp(1.5rem, 7vw, 3rem);
+  }
 }
 
 .alan-about-card {
   position: relative;
-  width: min(94%, 56rem);
+  flex: 0 0 min(82%, 48rem);
+  scroll-snap-align: center;
+  box-sizing: border-box;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1272,9 +1364,13 @@ body[data-slug="index"] {
   border: 1px solid var(--alan-border);
   border-radius: 16px;
   box-shadow: var(--alan-card-shadow);
+  opacity: 0.62;
+  transform: scale(0.93);
   transition:
-    transform 0.22s ease,
-    border-color 0.22s ease;
+    transform 0.28s ease,
+    opacity 0.28s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
 
   /* Signature left-center punch hole on horizontal cards */
   &::before {
@@ -1290,12 +1386,21 @@ body[data-slug="index"] {
     box-shadow: var(--alan-hole-shadow);
   }
 
+  &:not(.is-active) {
+    cursor: pointer;
+  }
+
+  &.is-active {
+    opacity: 1;
+    transform: scale(1);
+  }
+
   &:hover {
-    transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--secondary) 40%, var(--alan-border));
+    border-color: color-mix(in srgb, var(--secondary) 45%, var(--alan-border));
   }
 
   @media all and ($mobile) {
+    flex: 0 0 84%;
     flex-direction: column;
     text-align: center;
     padding: 2.8rem 1.4rem 1.75rem;
@@ -1307,6 +1412,36 @@ body[data-slug="index"] {
       margin-top: 0;
       margin-left: -0.675rem;
     }
+  }
+}
+
+.alan-carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 1.15rem;
+}
+
+.alan-carousel-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--alan-border);
+  cursor: pointer;
+  transition:
+    width 0.22s ease,
+    background-color 0.22s ease;
+
+  &.is-active {
+    width: 1.65rem;
+    background-color: var(--secondary);
+  }
+
+  &:hover:not(.is-active) {
+    background-color: color-mix(in srgb, var(--secondary) 55%, var(--alan-border));
   }
 }
 
@@ -1373,7 +1508,7 @@ body[data-slug="index"] {
   &:hover {
     background-color: var(--secondary);
     color: #ffffff !important;
-    transform: translateY(-1px);
+    transform: translateX(3px);
   }
 }
 
@@ -1415,7 +1550,24 @@ body[data-slug="index"] {
   }
 
   @media all and (max-width: 640px) {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 1rem;
+    padding: 0.25rem 0.5rem 0.75rem;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    .alan-dir-card {
+      flex: 0 0 84%;
+      scroll-snap-align: center;
+    }
   }
 }
 
@@ -1436,12 +1588,10 @@ body[data-slug="index"] {
   overflow: hidden;
   box-shadow: var(--alan-card-shadow);
   transition:
-    transform 0.2s ease,
     box-shadow 0.2s ease,
     border-color 0.2s ease;
 
   &:hover {
-    transform: translateY(-4px);
     border-color: color-mix(in srgb, var(--secondary) 48%, var(--alan-border));
   }
 }
@@ -1556,7 +1706,7 @@ a.alan-dir-cta {
   &:hover {
     background-color: var(--secondary);
     color: #ffffff !important;
-    transform: translateY(-1px);
+    transform: translateX(3px);
   }
 }
 
@@ -1575,8 +1725,28 @@ body[data-slug="index"] .page-footer#alan-graph {
   }
 
   .graph > .graph-outer {
-    height: 360px;
+    height: clamp(420px, 60vh, 540px);
     border-radius: 18px;
+
+    > .global-graph-icon {
+      width: 32px;
+      height: 32px;
+      top: 0.65rem;
+      right: 0.65rem;
+      margin: 0;
+      padding: 0.4rem;
+      opacity: 0.78;
+      border-radius: 8px;
+      border: 1px solid var(--alan-border);
+      background-color: color-mix(in srgb, var(--light) 85%, transparent);
+
+      &:hover {
+        opacity: 1;
+        border-color: var(--secondary);
+        color: var(--secondary);
+        background-color: var(--light);
+      }
+    }
   }
 }
 

@@ -343,54 +343,185 @@ const ALAN_CLIENT_SCRIPT = `
     sec.setAttribute("aria-label", "About");
     sec.innerHTML =
       '<h2 class="alan-section-title">About</h2>' +
-      '<div class="alan-about-deck">' +
-        '<article class="alan-about-card">' +
-          '<div class="alan-about-art" aria-hidden="true">' +
-            '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-              '<circle cx="80" cy="70" r="52" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 5" opacity="0.65"/>' +
-              '<circle cx="80" cy="70" r="36" stroke="var(--secondary)" stroke-width="2" fill="var(--secondary)" fill-opacity="0.1"/>' +
-              '<path d="M80 24l11 35 35 11-35 11-11 35-11-35-35-11 35-11 11-35Z" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18" stroke-linejoin="round"/>' +
-              '<circle cx="80" cy="70" r="5" fill="var(--dark)"/>' +
-            '</svg>' +
-          '</div>' +
-          '<div class="alan-about-content">' +
-            '<h3 class="alan-about-title">Explorer</h3>' +
-            '<p class="alan-about-text">保持好奇心的底层技术探索者，习惯用第一性原理把复杂的系统拆解清楚。喜欢简洁、克制且直击本质的表达方式，在这里持续记录对计算机体系结构、编译技术与系统性能的思考。</p>' +
-          '</div>' +
-        '</article>' +
-        '<article class="alan-about-card">' +
-          '<div class="alan-about-art" aria-hidden="true">' +
-            '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-              '<rect x="20" y="28" width="120" height="84" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
-              '<rect x="34" y="44" width="38" height="22" rx="5" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18"/>' +
-              '<rect x="88" y="44" width="38" height="22" rx="5" stroke="currentColor" stroke-width="1.8"/>' +
-              '<rect x="34" y="76" width="92" height="20" rx="5" stroke="var(--tertiary)" stroke-width="1.8" fill="var(--tertiary)" fill-opacity="0.16"/>' +
-              '<path d="M72 55h16M80 66v10" stroke="var(--secondary)" stroke-width="1.8" stroke-linecap="round"/>' +
-            '</svg>' +
-          '</div>' +
-          '<div class="alan-about-content">' +
-            '<h3 class="alan-about-title">Compilers &amp; Systems</h3>' +
-            '<p class="alan-about-text">日常研究与实践围绕 LLVM / MLIR 多级中间表示、TableGen 与代码生成、程序性能优化（Cache 局部性与矩阵乘法调优）、RISC-V RVV 向量扩展以及 LLM 大模型底层系统展开。</p>' +
-          '</div>' +
-        '</article>' +
-        '<article class="alan-about-card">' +
-          '<div class="alan-about-art" aria-hidden="true">' +
-            '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-              '<rect x="34" y="22" width="92" height="96" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
-              '<circle cx="80" cy="36" r="5" fill="var(--light)" stroke="currentColor" stroke-width="1.6"/>' +
-              '<path d="M50 56h60M50 72h52M50 88h40" stroke="var(--secondary)" stroke-width="2.2" stroke-linecap="round"/>' +
-              '<path d="M104 94l16-16 6 6-16 16-8 2 2-8Z" stroke="currentColor" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.25" stroke-linejoin="round"/>' +
-            '</svg>' +
-          '</div>' +
-          '<div class="alan-about-content">' +
-            '<h3 class="alan-about-title">Why This Garden?</h3>' +
-            '<p class="alan-about-text">看过的论文、读过的源码和踩过的坑如果不系统整理很容易遗忘。我把笔记按主题目录沉淀成这座可检索的数字花园——只求脉络清晰、随时可翻阅，也希望能给同路人带来一点参考。</p>' +
-            '<div class="alan-about-action">' +
-              '<a href="#alan-directories" class="alan-flat-btn" data-router-ignore="true" data-alan-scroll="directories">Explore Directories →</a>' +
+      '<div class="alan-about-carousel">' +
+        '<button type="button" class="alan-carousel-btn alan-carousel-prev" aria-label="上一张卡片" title="上一张">' +
+          '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>' +
+        '</button>' +
+        '<div class="alan-about-deck" tabindex="0" role="region" aria-label="About cards">' +
+          '<article class="alan-about-card is-active" data-slide="0">' +
+            '<div class="alan-about-art" aria-hidden="true">' +
+              '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                '<circle cx="80" cy="70" r="52" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 5" opacity="0.65"/>' +
+                '<circle cx="80" cy="70" r="36" stroke="var(--secondary)" stroke-width="2" fill="var(--secondary)" fill-opacity="0.1"/>' +
+                '<path d="M80 24l11 35 35 11-35 11-11 35-11-35-35-11 35-11 11-35Z" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18" stroke-linejoin="round"/>' +
+                '<circle cx="80" cy="70" r="5" fill="var(--dark)"/>' +
+              '</svg>' +
             '</div>' +
-          '</div>' +
-        '</article>' +
+            '<div class="alan-about-content">' +
+              '<h3 class="alan-about-title">Explorer</h3>' +
+              '<p class="alan-about-text">保持好奇心的底层技术探索者，习惯用第一性原理把复杂的系统拆解清楚。喜欢简洁、克制且直击本质的表达方式，在这里持续记录对计算机体系结构、编译技术与系统性能的思考。</p>' +
+            '</div>' +
+          '</article>' +
+          '<article class="alan-about-card" data-slide="1">' +
+            '<div class="alan-about-art" aria-hidden="true">' +
+              '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="20" y="28" width="120" height="84" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
+                '<rect x="34" y="44" width="38" height="22" rx="5" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18"/>' +
+                '<rect x="88" y="44" width="38" height="22" rx="5" stroke="currentColor" stroke-width="1.8"/>' +
+                '<rect x="34" y="76" width="92" height="20" rx="5" stroke="var(--tertiary)" stroke-width="1.8" fill="var(--tertiary)" fill-opacity="0.16"/>' +
+                '<path d="M72 55h16M80 66v10" stroke="var(--secondary)" stroke-width="1.8" stroke-linecap="round"/>' +
+              '</svg>' +
+            '</div>' +
+            '<div class="alan-about-content">' +
+              '<h3 class="alan-about-title">Compilers &amp; Systems</h3>' +
+              '<p class="alan-about-text">日常研究与实践围绕 LLVM / MLIR 多级中间表示、TableGen 与代码生成、程序性能优化（Cache 局部性与矩阵乘法调优）、RISC-V RVV 向量扩展以及 LLM 大模型底层系统展开。</p>' +
+            '</div>' +
+          '</article>' +
+          '<article class="alan-about-card" data-slide="2">' +
+            '<div class="alan-about-art" aria-hidden="true">' +
+              '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                '<rect x="34" y="22" width="92" height="96" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
+                '<circle cx="80" cy="36" r="5" fill="var(--light)" stroke="currentColor" stroke-width="1.6"/>' +
+                '<path d="M50 56h60M50 72h52M50 88h40" stroke="var(--secondary)" stroke-width="2.2" stroke-linecap="round"/>' +
+                '<path d="M104 94l16-16 6 6-16 16-8 2 2-8Z" stroke="currentColor" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.25" stroke-linejoin="round"/>' +
+              '</svg>' +
+            '</div>' +
+            '<div class="alan-about-content">' +
+              '<h3 class="alan-about-title">Why This Garden?</h3>' +
+              '<p class="alan-about-text">看过的论文、读过的源码和踩过的坑如果不系统整理很容易遗忘。我把笔记按主题目录沉淀成这座可检索的数字花园——只求脉络清晰、随时可翻阅，也希望能给同路人带来一点参考。</p>' +
+              '<div class="alan-about-action">' +
+                '<a href="#alan-directories" class="alan-flat-btn" data-router-ignore="true" data-alan-scroll="directories">Explore Directories →</a>' +
+              '</div>' +
+            '</div>' +
+          '</article>' +
+        '</div>' +
+        '<button type="button" class="alan-carousel-btn alan-carousel-next" aria-label="下一张卡片" title="下一张">' +
+          '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="alan-carousel-dots" role="tablist" aria-label="About 卡片导航">' +
+        '<button type="button" class="alan-carousel-dot is-active" data-slide-to="0" aria-label="第 1 张卡片"></button>' +
+        '<button type="button" class="alan-carousel-dot" data-slide-to="1" aria-label="第 2 张卡片"></button>' +
+        '<button type="button" class="alan-carousel-dot" data-slide-to="2" aria-label="第 3 张卡片"></button>' +
       '</div>';
+
+    var deck = sec.querySelector(".alan-about-deck");
+    var cards = Array.from(sec.querySelectorAll(".alan-about-card"));
+    var dots = Array.from(sec.querySelectorAll(".alan-carousel-dot"));
+    var prevBtn = sec.querySelector(".alan-carousel-prev");
+    var nextBtn = sec.querySelector(".alan-carousel-next");
+    var activeIdx = 0;
+
+    function scrollToCard(idx) {
+      if (!deck || cards.length === 0) return;
+      var wrapped = ((idx % cards.length) + cards.length) % cards.length;
+      var card = cards[wrapped];
+      var targetLeft = card.offsetLeft - (deck.clientWidth - card.clientWidth) / 2;
+      deck.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+    }
+
+    function syncCarouselState() {
+      if (!deck || cards.length === 0) return;
+      var centerX = deck.scrollLeft + deck.clientWidth / 2;
+      var bestIdx = 0;
+      var bestDist = Infinity;
+      cards.forEach(function (card, idx) {
+        var cardCenter = card.offsetLeft + card.clientWidth / 2;
+        var dist = Math.abs(centerX - cardCenter);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = idx;
+        }
+      });
+      activeIdx = bestIdx;
+      cards.forEach(function (card, idx) {
+        if (idx === bestIdx) {
+          card.classList.add("is-active");
+        } else {
+          card.classList.remove("is-active");
+        }
+      });
+      dots.forEach(function (dot, idx) {
+        if (idx === bestIdx) {
+          dot.classList.add("is-active");
+        } else {
+          dot.classList.remove("is-active");
+        }
+      });
+    }
+
+    if (deck) {
+      var rafPending = false;
+      deck.addEventListener(
+        "scroll",
+        function () {
+          if (!rafPending) {
+            rafPending = true;
+            window.requestAnimationFrame(function () {
+              syncCarouselState();
+              rafPending = false;
+            });
+          }
+        },
+        { passive: true }
+      );
+
+      cards.forEach(function (card, idx) {
+        card.addEventListener("click", function (e) {
+          if (e.target && e.target.closest && e.target.closest("a, button")) return;
+          if (idx !== activeIdx) scrollToCard(idx);
+        });
+      });
+
+      var isDragging = false;
+      var startX = 0;
+      var startScroll = 0;
+      deck.addEventListener("mousedown", function (e) {
+        if (e.button !== 0) return;
+        if (e.target && e.target.closest && e.target.closest("a, button")) return;
+        isDragging = true;
+        startX = e.pageX;
+        startScroll = deck.scrollLeft;
+        deck.classList.add("is-dragging");
+      });
+      window.addEventListener("mousemove", function (e) {
+        if (!isDragging) return;
+        var dx = e.pageX - startX;
+        deck.scrollLeft = startScroll - dx;
+      });
+      window.addEventListener("mouseup", function () {
+        if (!isDragging) return;
+        isDragging = false;
+        deck.classList.remove("is-dragging");
+      });
+
+      deck.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          scrollToCard(activeIdx - 1);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          scrollToCard(activeIdx + 1);
+        }
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", function () {
+        scrollToCard(activeIdx - 1);
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", function () {
+        scrollToCard(activeIdx + 1);
+      });
+    }
+    dots.forEach(function (dot) {
+      dot.addEventListener("click", function () {
+        var idx = parseInt(dot.getAttribute("data-slide-to") || "0", 10);
+        scrollToCard(idx);
+      });
+    });
 
     var btn = sec.querySelector('[data-alan-scroll="directories"]');
     if (btn) {
@@ -400,6 +531,11 @@ const ALAN_CLIENT_SCRIPT = `
         if (dirSec) dirSec.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
+
+    window.requestAnimationFrame(function () {
+      scrollToCard(0);
+      syncCarouselState();
+    });
     return sec;
   }
 

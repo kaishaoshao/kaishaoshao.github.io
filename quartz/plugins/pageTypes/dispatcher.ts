@@ -2,10 +2,11 @@ import { QuartzEmitterPlugin, QuartzPageTypePluginInstance, TreeTransform } from
 import { QuartzComponent, QuartzComponentProps } from "../../components/types"
 import { pageResources, renderPage } from "../../components/renderPage"
 import { FullPageLayout } from "../../cfg"
-import { FilePath, FullSlug, pathToRoot } from "../../util/path"
+import { FilePath, FullSlug, SimpleSlug, pathToRoot, simplifySlug } from "../../util/path"
 import { ProcessedContent, defaultProcessedContent } from "../vfile"
 import { write } from "../emitters/helpers"
-import { BuildCtx, trieFromAllFiles } from "../../util/ctx"
+import { BuildCtx, BuildTimeTrieData, trieFromAllFiles } from "../../util/ctx"
+import { FileTrieNode } from "../../util/fileTrie"
 import { StaticResources } from "../../util/resources"
 import { render } from "preact-render-to-string"
 import { fromHtml } from "hast-util-from-html"
@@ -147,6 +148,91 @@ function populateVirtualPageHtmlAst(
   }
 }
 
+type VirtualEntry = {
+  tree: ProcessedContent[0]
+  vfile: ProcessedContent[1]
+  layout: FullPageLayout
+  vpSlug: FullSlug
+}
+
+function hasVisibleTrieContent(node: FileTrieNode<BuildTimeTrieData>): boolean {
+  const data = node.data as { unlisted?: unknown } | null
+  if (data) {
+    return data.unlisted !== true
+  }
+  return node.children.some(hasVisibleTrieContent)
+}
+
+/**
+ * Populate outgoing graph links on virtual index pages (folder indexes and tags/index)
+ * so Knowledge Graph reflects folder hierarchy even when root pages link only to top-level dirs.
+ */
+function populateVirtualLinks(
+  virtualEntries: VirtualEntry[],
+  trie: FileTrieNode<BuildTimeTrieData> | undefined,
+) {
+  const tagSlugs: SimpleSlug[] = virtualEntries
+    .filter((ve) => ve.vpSlug.startsWith("tags/") && ve.vpSlug !== "tags/index")
+    .map((ve) => simplifySlug(ve.vpSlug))
+
+  for (const ve of virtualEntries) {
+    if (!ve.vpSlug.endsWith("/index") || ve.vpSlug === "404") continue
+    const selfSimple = simplifySlug(ve.vpSlug)
+    const links = new Set<SimpleSlug>((ve.vfile.data.links as SimpleSlug[] | undefined) ?? [])
+
+    if (ve.vpSlug === "tags/index") {
+      for (const tagSlug of tagSlugs) {
+        if (tagSlug !== selfSimple) links.add(tagSlug)
+      }
+    } else if (trie) {
+      const folderNode = trie.findNode(ve.vpSlug.split("/"))
+      if (folderNode) {
+        for (const child of folderNode.children) {
+          if (!hasVisibleTrieContent(child)) continue
+          const target = simplifySlug(child.slug)
+          if (target !== selfSimple) links.add(target)
+        }
+      }
+    }
+
+    if (links.size > 0) {
+      ve.vfile.data.links = Array.from(links)
+    }
+  }
+}
+
+function collectVirtualEntries(
+  pageTypes: QuartzPageTypePluginInstance[],
+  content: ProcessedContent[],
+  cfg: BuildCtx["cfg"]["configuration"],
+  ctx: BuildCtx,
+  defaults: Partial<FullPageLayout>,
+  byPageType: Record<string, Partial<FullPageLayout>>,
+): VirtualEntry[] {
+  const virtualEntries: VirtualEntry[] = []
+  for (const pt of pageTypes) {
+    if (!pt.generate) continue
+    const virtualPages = pt.generate({ content, cfg, ctx })
+    const layout = resolveLayout(pt, defaults, byPageType)
+    for (const vp of virtualPages) {
+      const vpSlug = vp.slug as FullSlug
+      const vpRelativePath = (vpSlug + ".md") as FilePath
+      const [tree, vfile] = defaultProcessedContent({
+        slug: vpSlug,
+        relativePath: vpRelativePath,
+        frontmatter: { title: vp.title, tags: [] },
+        ...vp.data,
+      })
+      if (vpSlug !== "404") {
+        ctx.virtualPages.push([tree, vfile])
+      }
+      virtualEntries.push({ tree, vfile, layout, vpSlug })
+    }
+  }
+  populateVirtualLinks(virtualEntries, ctx.trie)
+  return virtualEntries
+}
+
 export const PageTypeDispatcher: QuartzEmitterPlugin<Partial<DispatcherOptions>> = (userOpts) => {
   const defaults = userOpts?.defaults ?? {}
   const byPageType = userOpts?.byPageType ?? {}
@@ -172,31 +258,14 @@ export const PageTypeDispatcher: QuartzEmitterPlugin<Partial<DispatcherOptions>>
 
       // Phase 1: Generate all virtual pages first so their data is available in allFiles
       // for transclude resolution in renderPage (e.g. ![[file.canvas]], ![[file.base]])
-      const virtualEntries: Array<{
-        tree: ProcessedContent[0]
-        vfile: ProcessedContent[1]
-        layout: FullPageLayout
-        vpSlug: FullSlug
-      }> = []
-      for (const pt of pageTypes) {
-        if (!pt.generate) continue
-        const virtualPages = pt.generate({ content, cfg, ctx })
-        const layout = resolveLayout(pt, defaults, byPageType)
-        for (const vp of virtualPages) {
-          const vpSlug = vp.slug as FullSlug
-          const vpRelativePath = (vpSlug + ".md") as FilePath
-          const [tree, vfile] = defaultProcessedContent({
-            slug: vpSlug,
-            relativePath: vpRelativePath,
-            frontmatter: { title: vp.title, tags: [] },
-            ...vp.data,
-          })
-          if (vpSlug !== "404") {
-            ctx.virtualPages.push([tree, vfile])
-          }
-          virtualEntries.push({ tree, vfile, layout, vpSlug })
-        }
-      }
+      const virtualEntries = collectVirtualEntries(
+        pageTypes,
+        content,
+        cfg,
+        ctx,
+        defaults,
+        byPageType,
+      )
 
       // Merge virtual page data into allFiles before populating htmlAst so that
       // Body components rendered during populateVirtualPageHtmlAst can resolve
@@ -266,31 +335,14 @@ export const PageTypeDispatcher: QuartzEmitterPlugin<Partial<DispatcherOptions>>
       }
 
       // Phase 1: Generate all virtual pages first so their data is available in allFiles
-      const virtualEntries: Array<{
-        tree: ProcessedContent[0]
-        vfile: ProcessedContent[1]
-        layout: FullPageLayout
-        vpSlug: FullSlug
-      }> = []
-      for (const pt of pageTypes) {
-        if (!pt.generate) continue
-        const virtualPages = pt.generate({ content, cfg, ctx })
-        const layout = resolveLayout(pt, defaults, byPageType)
-        for (const vp of virtualPages) {
-          const vpSlug = vp.slug as FullSlug
-          const vpRelativePath = (vpSlug + ".md") as FilePath
-          const [tree, vfile] = defaultProcessedContent({
-            slug: vpSlug,
-            relativePath: vpRelativePath,
-            frontmatter: { title: vp.title, tags: [] },
-            ...vp.data,
-          })
-          if (vpSlug !== "404") {
-            ctx.virtualPages.push([tree, vfile])
-          }
-          virtualEntries.push({ tree, vfile, layout, vpSlug })
-        }
-      }
+      const virtualEntries = collectVirtualEntries(
+        pageTypes,
+        content,
+        cfg,
+        ctx,
+        defaults,
+        byPageType,
+      )
 
       const allFilesWithVirtual = [...allFiles, ...virtualEntries.map((ve) => ve.vfile.data)]
 

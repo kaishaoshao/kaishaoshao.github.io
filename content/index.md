@@ -15,15 +15,10 @@ title: kaishaoshao的个人空间 🌱
 ### Notes
 
 - [[notes/Arch/体系结构常见名词|体系结构常见名词表]]：notes/Arch/体系结构常见名词.md
-- [[notes/LLM/Zero-To-Hero|Zero to Hero]]：notes/LLM/Zero-To-Hero.md
-- [[notes/LLVM/LLVM_Code_Generation/codegen-01|codegen-01]]：notes/LLVM/LLVM_Code_Generation/codegen-01.md
-- [[notes/LLVM/LLVM_Code_Generation/codegen-02|codegen-02]]：notes/LLVM/LLVM_Code_Generation/codegen-02.md
-- [[notes/MLIR/mlir-tooling-playground|mlir-tooling-playground]]：notes/MLIR/mlir-tooling-playground.md
 - [[notes/MLIR/mlir_tablegen_note-1|TableGen Basic 01]]：notes/MLIR/mlir_tablegen_note-1.md
-- [[notes/MLIR/mlir_tablegen_note-2|TableGen Basic 02]]：notes/MLIR/mlir_tablegen_note-2.md
-- [[notes/Opt/01-程序优化方法总结|程序优化方法总结]]：notes/Opt/01-程序优化方法总结.md
 - [[notes/Opt/02-程序性能优化之矩阵乘法-1|程序性能优化之矩阵乘法(1)]]：notes/Opt/02-程序性能优化之矩阵乘法-1.md
 - [[notes/RISCV/03-riscv-rvv学习-1|riscv rvv 学习-1]]：notes/RISCV/03-riscv-rvv学习-1.md
+- [[notes/LLM/Zero-To-Hero|Zero to Hero]]：notes/LLM/Zero-To-Hero.md
 
 ### Skills
 

@@ -674,12 +674,121 @@ include "setup.td"
 def DagOps {
   // !dag(operator, args, argNames) - 创建一个DAG(有向无环图节点)
   dag binOp1 = !dag(addOp, [10, 20], ["op1", "op2"]); // 创建结构为:(addOp 10:Sop1, 20:$op2)
+  // 为了说明assert的用法， 我们将DAG转换为其字符串表示形式
+  // 并检查它是否与我们的预期值相等，请注意，
+  // 也可以使用!eq直接比较两个DAG是否相等，但由于我们仅仅是为了
+  // 确认该DAG确实被正确创建，因此将其与字符串表示形式进行比对
   assert !eq(!repr(binOp1), "(addOp 10:$op1, 20:$op2)"), errorStr;
+  
+  // !getdagarg<type>(dag, key)
+  // 根据给定的`key`获取参数的值
+  // 其中key可以是参数名称(name)或索引位置(index)
+  int op1_v = !getdagarg<int>(binOp1, "op1"); // 10
+  assert !eq(op1_v, 10), errorStr;
+
+  int op2_v = !getdagarg<int>(binOp1, 1); // 20
+  assert !eq(op2_v, 20), errorStr;
+
+  // !setdagname(dag, key, name) - 创建一个新的 DAG，并将指定参数重命名 
+  dag binOp2 = !setdagname(binOp1, "op2", "op3"); // creates: (addOp 10:$op1, 20:$op3)
+  assert !eq(!repr(binOp2), "(addOp 10:$op1, 20:$op3)"), errorStr;
+
+
+  // !setdagarg(dag, key, value) - 创建一个新的DAG,并修改指定参数的值
+  dag binOp3 = !setdagarg(binOp2, 0, 20); // 创建结果为(addOp 20:$op1, 20:$op2)  
+  assert !eq(!repr(binOp3), "(addOp 20:$op1, 20:$op3)"), errorStr;
+
+  // !setdagop(dag, op) = 创建一个新的DAG, 并更换其操作符(operator)
+  dag binOp4 = !setdagop(binOp3, mulOp); // 创建结果为: (mulOp 20:$op1, 20:$op3)
+  assert !eq(!repr(binOp4), "(mulOp 20:$op1, 20:$op3)"), errorStr;
+
+  // 将foreach 应用于DAG列表
+  list<int> op1s = !foreach(dg, [binOp1, binOp3], !getdagarg<int>(dg, "op1"));
+  assert !eq(!repr(op1s), "[10, 20]"), errorStr;
+
+  // !getdagop<type>(dag) - 获取DAG的操作符
+  Op op = !getdagop<Op>(binOp1); // addOp
+  assert !eq(op, addOp), errorStr;
+
+  // !con(dag1, dag2) - 拼接两个DAG
+  // 如下所示：
+  // !con((addOp 10:$op1, 20:$op2), (addOp 20:$op1, 20:$op3))
+  dag combinedOps = !con(binOp1, binOp3);
+  // 注意：因为两个DAG都有$op1, 所以合并后存在两个名为$op1的节点
+  assert !eq(!repr(combinedOps), "(addOp 10:$op1, 20:$op2, 20:$op1, 20:$op3)"), errorStr;
+  // 尝试按名称获取op1的值时，将返回具有该名称的第一个节点的值
+  int combined_op_v = !getdagarg<int>(combinedOps, "op1"); // 10
+  assert !eq(combined_op_v, 10), errorStr;
+
+  // !getdagname(dag, index) - 获取指定索引处参数的名称
+  string name_v = !getdagname(binOp1, 0); // "op1"
+  assert !eq(name_v, "op1"), errorStr;
+
+  // size(a) 应用于DAG: 返回参数个数
+  int size_v = !size(binOp1); // 2
+  assert !eq(size_v, 2), errorStr;
+
+  // 如果一个DAG没有参数，则被视为空(empty). 操作符本身不算作参数
+  bit empty_f = !empty(binOp1); // 0
+  assert !eq(empty_f, 0), errorStr;
+
+  dag emptyDag = !dag(addOp, []<int>, []<string>);
+  bit empty_t = !empty(emptyDag); // 1
+  assert empty_t, errorStr;
+
+  // 重要提示：我们本可以使用字符串作为操作符(op)来创建DAG.
+  // 因此以下写法在语法上是合法的
+  dag binOp5 = !dag("myOp", [10, 20], ["op1", "op2"]);
+  assert !eq(!repr(binOp5), "(\"myOp\" 10:$op1, 20:$op2)"), errorStr;
+  // 但是当我们尝试合并两个DAG时，两者操作符并须完全相等
+  // 在TableGen中，两个字面量相同的字符串并不相等，
+  // 因为它们指向不同的内存地址(确实容易让人困惑)
+  dag binOp6 = !dag("myOp", [10, 20], ["op3", "op4"]);
+  // 以下合并两者的尝试将会报错失败：
+  // dag combinedOps2 = !con(binOp5, binOp6);
+  // error: Initializer of 'combinedOps2' in 'DagOps' could not be fully resolved:
+  // !con("myOp" 10:$op1, 20:$op2), ("myOp" 10:$op3, 20:$op4)
+  // 这是因为!con只有在操作符相同时才能正常工作。
+  // 然而binOp5和binOp6中的两个"myOp"字符串被判定为不相同。
+  // 这就是为什么我们通常使用record(记录)作为操作符(就像上面示例中使用的addOp一样)
+
 }
 
 #endif // DAGOP
 ```
 输出
 ```bash 
-
+------------- Classes -----------------
+class Op {
+  string name = ?;
+}
+------------- Defs -----------------
+def DagOps {
+  dag binOp1 = (addOp 10:$op1, 20:$op2);
+  int op1_v = 10;
+  int op2_v = 20;
+  dag binOp2 = (addOp 10:$op1, 20:$op3);
+  dag binOp3 = (addOp 20:$op1, 20:$op3);
+  dag binOp4 = (mulOp 20:$op1, 20:$op3);
+  list<int> op1s = [10, 20];
+  Op op = addOp;
+  dag combinedOps = (addOp 10:$op1, 20:$op2, 20:$op1, 20:$op3);
+  int combined_op_v = 10;
+  string name_v = "op1";
+  int size_v = 2;
+  bit empty_f = 0;
+  dag emptyDag = (addOp);
+  bit empty_t = 1;
+  dag binOp5 = ("myOp" 10:$op1, 20:$op2);
+  dag binOp6 = ("myOp" 10:$op3, 20:$op4);
+}
+def addOp {     // Op
+  string name = "add";
+}
+def divOp {     // Op
+  string name = "div";
+}
+def mulOp {     // Op
+  string name = "mul";
+}
 ```

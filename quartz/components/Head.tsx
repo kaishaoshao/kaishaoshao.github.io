@@ -146,6 +146,108 @@ const ALAN_CLIENT_SCRIPT = `
       : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
   }
 
+  var HOME_SLIDES = [
+    { id: "alan-intro", label: "Intro", hash: "#alan-intro" },
+    { id: "alan-about", label: "About", hash: "#alan-about" },
+    { id: "alan-directories", label: "Directories", hash: "#alan-directories" },
+    { id: "alan-graph", label: "Graph", hash: "#alan-graph" },
+    { id: "alan-notes", label: "Notes", hash: "#alan-notes" }
+  ];
+
+  function resolveInitialHomeSlide() {
+    var hash = (window.location.hash || "").toLowerCase();
+    for (var i = 0; i < HOME_SLIDES.length; i++) {
+      var h = HOME_SLIDES[i].hash.toLowerCase();
+      var shortH = "#" + HOME_SLIDES[i].label.toLowerCase();
+      if (hash === h || hash === shortH) return i;
+    }
+    return 0;
+  }
+
+  function syncHomeSlideUI(idx) {
+    var total = HOME_SLIDES.length;
+    var safeIdx = Math.max(0, Math.min(total - 1, idx));
+    window.__alanHomeSlide = safeIdx;
+
+    document.querySelectorAll("#alan-menu-items a[data-alan-slide]").forEach(function (a) {
+      var sIdx = parseInt(a.getAttribute("data-alan-slide") || "0", 10);
+      if (sIdx === safeIdx) {
+        a.classList.add("active");
+      } else {
+        a.classList.remove("active");
+      }
+    });
+
+    document.querySelectorAll("#alan-stage-dots button[data-alan-slide]").forEach(function (btn) {
+      var sIdx = parseInt(btn.getAttribute("data-alan-slide") || "0", 10);
+      if (sIdx === safeIdx) {
+        btn.classList.add("is-active");
+        btn.setAttribute("aria-selected", "true");
+      } else {
+        btn.classList.remove("is-active");
+        btn.setAttribute("aria-selected", "false");
+      }
+    });
+
+    var prevBtn = document.getElementById("alan-stage-prev");
+    if (prevBtn) {
+      prevBtn.disabled = safeIdx <= 0;
+      var prevMeta = safeIdx > 0 ? HOME_SLIDES[safeIdx - 1] : null;
+      prevBtn.setAttribute("title", prevMeta ? "向左：" + prevMeta.label : "已是第一屏");
+      prevBtn.setAttribute("aria-label", prevMeta ? "上一屏：" + prevMeta.label : "已是第一屏");
+    }
+
+    var nextBtn = document.getElementById("alan-stage-next");
+    if (nextBtn) {
+      nextBtn.disabled = safeIdx >= total - 1;
+      var nextMeta = safeIdx < total - 1 ? HOME_SLIDES[safeIdx + 1] : null;
+      nextBtn.setAttribute("title", nextMeta ? "向右：" + nextMeta.label : "已是最后一屏");
+      nextBtn.setAttribute("aria-label", nextMeta ? "下一屏：" + nextMeta.label : "已是最后一屏");
+    }
+
+    var fill = document.querySelector("#alan-reading-progress .alan-progress-fill");
+    if (fill) {
+      fill.style.width = (((safeIdx + 1) / total) * 100).toFixed(2) + "%";
+    }
+
+    var star = document.getElementById("alan-intro-star");
+    if (star) {
+      var deg = -(safeIdx * 45);
+      star.style.transform = "rotate(" + deg + "deg)";
+    }
+  }
+
+  function goToHomeSlide(idx, animate) {
+    var total = HOME_SLIDES.length;
+    var safeIdx = Math.max(0, Math.min(total - 1, idx));
+    var stage = document.getElementById("alan-stage");
+    syncHomeSlideUI(safeIdx);
+    if (stage) {
+      var targetLeft = safeIdx * stage.clientWidth;
+      stage.scrollTo({ left: targetLeft, behavior: animate === false ? "auto" : "smooth" });
+      if (safeIdx === 3) {
+        window.requestAnimationFrame(function () {
+          var gc = stage.querySelector("#alan-graph .graph-container");
+          var cv = gc ? gc.querySelector("canvas") : null;
+          if (gc && (!cv || cv.width === 0 || Math.abs(cv.getBoundingClientRect().width - gc.clientWidth) > 24)) {
+            document.dispatchEvent(new CustomEvent("render"));
+          }
+        });
+      }
+    }
+    var targetHash = safeIdx === 0 ? "" : HOME_SLIDES[safeIdx].hash;
+    try {
+      if (window.history && window.history.replaceState) {
+        var nextUrl = targetHash
+          ? window.location.pathname + window.location.search + targetHash
+          : window.location.pathname + window.location.search;
+        if (window.location.href !== window.location.origin + nextUrl) {
+          window.history.replaceState(null, "", nextUrl);
+        }
+      }
+    } catch (e) {}
+  }
+
   function mountTopMenu(isHome) {
     var existing = document.getElementById("alan-top-menu");
     if (!isHome) {
@@ -154,6 +256,7 @@ const ALAN_CLIENT_SCRIPT = `
     }
     if (existing) {
       syncTopThemeBtn();
+      syncHomeSlideUI(window.__alanHomeSlide || 0);
       return;
     }
 
@@ -162,13 +265,13 @@ const ALAN_CLIENT_SCRIPT = `
     nav.setAttribute("aria-label", "Primary navigation");
     nav.innerHTML =
       '<div class="alan-menu-inner">' +
-        '<a href="#alan-intro" class="alan-menu-brand" data-router-ignore="true" data-alan-target="alan-intro">kaishaoshao</a>' +
+        '<a href="#alan-intro" class="alan-menu-brand" data-router-ignore="true" data-alan-slide="0">kaishaoshao</a>' +
         '<ul id="alan-menu-items">' +
-          '<li><a href="#alan-intro" data-router-ignore="true" data-alan-target="alan-intro" class="active">Intro</a></li>' +
-          '<li><a href="#alan-about" data-router-ignore="true" data-alan-target="alan-about">About</a></li>' +
-          '<li><a href="#alan-directories" data-router-ignore="true" data-alan-target="alan-directories">Directories</a></li>' +
-          '<li><a href="#alan-graph" data-router-ignore="true" data-alan-target="alan-graph">Graph</a></li>' +
-          '<li><a href="./notes/">Notes</a></li>' +
+          '<li><a href="#alan-intro" data-router-ignore="true" data-alan-slide="0" class="active">Intro</a></li>' +
+          '<li><a href="#alan-about" data-router-ignore="true" data-alan-slide="1">About</a></li>' +
+          '<li><a href="#alan-directories" data-router-ignore="true" data-alan-slide="2">Directories</a></li>' +
+          '<li><a href="#alan-graph" data-router-ignore="true" data-alan-slide="3">Graph</a></li>' +
+          '<li><a href="#alan-notes" data-router-ignore="true" data-alan-slide="4">Notes</a></li>' +
         '</ul>' +
         '<div class="alan-top-actions">' +
           '<button type="button" id="alan-top-search" class="alan-top-icon-btn" aria-label="Search (Ctrl+K)" title="搜索文章 (Ctrl+K)">' +
@@ -182,14 +285,11 @@ const ALAN_CLIENT_SCRIPT = `
     var root = document.getElementById("quartz-root") || document.body;
     root.insertBefore(nav, root.firstChild);
 
-    nav.querySelectorAll("[data-alan-target]").forEach(function (link) {
+    nav.querySelectorAll("[data-alan-slide]").forEach(function (link) {
       link.addEventListener("click", function (e) {
         e.preventDefault();
-        var id = link.getAttribute("data-alan-target");
-        var target = id ? document.getElementById(id) : null;
-        if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        var sIdx = parseInt(link.getAttribute("data-alan-slide") || "0", 10);
+        goToHomeSlide(sIdx, true);
       });
     });
 
@@ -228,37 +328,16 @@ const ALAN_CLIENT_SCRIPT = `
   }
 
   function updateScrollEffects() {
+    if (document.body && document.body.getAttribute("data-slug") === "index") {
+      syncHomeSlideUI(window.__alanHomeSlide || 0);
+      return;
+    }
     var fill = document.querySelector("#alan-reading-progress .alan-progress-fill");
     var scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
     var docHeight = document.documentElement.scrollHeight - window.innerHeight;
     if (fill) {
       var ratio = docHeight > 0 ? Math.min(1, Math.max(0, scrollTop / docHeight)) : 0;
       fill.style.width = (ratio * 100).toFixed(2) + "%";
-    }
-    var star = document.getElementById("alan-intro-star");
-    if (star) {
-      var deg = -(scrollTop * 0.12);
-      var scale = Math.max(0.76, 1 - scrollTop / 2200);
-      star.style.transform = "rotate(" + deg.toFixed(1) + "deg) scale(" + scale.toFixed(3) + ")";
-    }
-
-    var menuLinks = document.querySelectorAll("#alan-menu-items a[data-alan-target]");
-    if (menuLinks.length > 0) {
-      var activeId = "alan-intro";
-      var anchorIds = ["alan-intro", "alan-about", "alan-directories", "alan-graph"];
-      anchorIds.forEach(function (id) {
-        var sec = document.getElementById(id);
-        if (sec && sec.getBoundingClientRect().top <= 160) {
-          activeId = id;
-        }
-      });
-      menuLinks.forEach(function (a) {
-        if (a.getAttribute("data-alan-target") === activeId) {
-          a.classList.add("active");
-        } else {
-          a.classList.remove("active");
-        }
-      });
     }
   }
 
@@ -269,6 +348,7 @@ const ALAN_CLIENT_SCRIPT = `
     window.addEventListener(
       "scroll",
       function () {
+        if (document.body && document.body.getAttribute("data-slug") === "index") return;
         if (!ticking) {
           ticking = true;
           window.requestAnimationFrame(function () {
@@ -279,6 +359,52 @@ const ALAN_CLIENT_SCRIPT = `
       },
       { passive: true }
     );
+
+    window.addEventListener("resize", function () {
+      if (!document.body || document.body.getAttribute("data-slug") !== "index") return;
+      var stage = document.getElementById("alan-stage");
+      if (stage) {
+        var idx = window.__alanHomeSlide || 0;
+        stage.scrollTo({ left: idx * stage.clientWidth, behavior: "auto" });
+      }
+    });
+
+    window.addEventListener("hashchange", function () {
+      if (!document.body || document.body.getAttribute("data-slug") !== "index") return;
+      goToHomeSlide(resolveInitialHomeSlide(), true);
+    });
+
+    window.addEventListener("keydown", function (e) {
+      if (!document.body || document.body.getAttribute("data-slug") !== "index") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      var activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.tagName === "SELECT" ||
+          activeEl.isContentEditable)
+      ) {
+        return;
+      }
+      var searchSpace = document.querySelector(".search-container.active");
+      if (searchSpace) return;
+      var globalGraphActive = document.querySelector(".global-graph-outer.active");
+      if (globalGraphActive) return;
+
+      var cur = window.__alanHomeSlide || 0;
+      if (e.key === "ArrowLeft") {
+        if (cur > 0) {
+          e.preventDefault();
+          goToHomeSlide(cur - 1, true);
+        }
+      } else if (e.key === "ArrowRight") {
+        if (cur < HOME_SLIDES.length - 1) {
+          e.preventDefault();
+          goToHomeSlide(cur + 1, true);
+        }
+      }
+    });
   }
 
   function getDirCardMeta(dirLabel, href) {
@@ -338,205 +464,165 @@ const ALAN_CLIENT_SCRIPT = `
   }
 
   function buildAboutSection() {
-    var sec = document.createElement("section");
-    sec.id = "alan-about";
-    sec.setAttribute("aria-label", "About");
-    sec.innerHTML =
+    var inner = document.createElement("div");
+    inner.className = "alan-slide-inner alan-about-inner";
+    inner.innerHTML =
       '<h2 class="alan-section-title">About</h2>' +
-      '<div class="alan-about-carousel">' +
-        '<button type="button" class="alan-carousel-btn alan-carousel-prev" aria-label="上一张卡片" title="上一张">' +
-          '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>' +
-        '</button>' +
-        '<div class="alan-about-deck" tabindex="0" role="region" aria-label="About cards">' +
-          '<article class="alan-about-card is-active" data-slide="0">' +
-            '<div class="alan-about-art" aria-hidden="true">' +
-              '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-                '<circle cx="80" cy="70" r="52" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 5" opacity="0.65"/>' +
-                '<circle cx="80" cy="70" r="36" stroke="var(--secondary)" stroke-width="2" fill="var(--secondary)" fill-opacity="0.1"/>' +
-                '<path d="M80 24l11 35 35 11-35 11-11 35-11-35-35-11 35-11 11-35Z" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18" stroke-linejoin="round"/>' +
-                '<circle cx="80" cy="70" r="5" fill="var(--dark)"/>' +
-              '</svg>' +
-            '</div>' +
-            '<div class="alan-about-content">' +
-              '<h3 class="alan-about-title">Explorer</h3>' +
-              '<p class="alan-about-text">保持好奇心的底层技术探索者，习惯用第一性原理把复杂的系统拆解清楚。喜欢简洁、克制且直击本质的表达方式，在这里持续记录对计算机体系结构、编译技术与系统性能的思考。</p>' +
-            '</div>' +
-          '</article>' +
-          '<article class="alan-about-card" data-slide="1">' +
-            '<div class="alan-about-art" aria-hidden="true">' +
-              '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-                '<rect x="20" y="28" width="120" height="84" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
-                '<rect x="34" y="44" width="38" height="22" rx="5" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18"/>' +
-                '<rect x="88" y="44" width="38" height="22" rx="5" stroke="currentColor" stroke-width="1.8"/>' +
-                '<rect x="34" y="76" width="92" height="20" rx="5" stroke="var(--tertiary)" stroke-width="1.8" fill="var(--tertiary)" fill-opacity="0.16"/>' +
-                '<path d="M72 55h16M80 66v10" stroke="var(--secondary)" stroke-width="1.8" stroke-linecap="round"/>' +
-              '</svg>' +
-            '</div>' +
-            '<div class="alan-about-content">' +
-              '<h3 class="alan-about-title">Compilers &amp; Systems</h3>' +
-              '<p class="alan-about-text">日常研究与实践围绕 LLVM / MLIR 多级中间表示、TableGen 与代码生成、程序性能优化（Cache 局部性与矩阵乘法调优）、RISC-V RVV 向量扩展以及 LLM 大模型底层系统展开。</p>' +
-            '</div>' +
-          '</article>' +
-          '<article class="alan-about-card" data-slide="2">' +
-            '<div class="alan-about-art" aria-hidden="true">' +
-              '<svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-                '<rect x="34" y="22" width="92" height="96" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
-                '<circle cx="80" cy="36" r="5" fill="var(--light)" stroke="currentColor" stroke-width="1.6"/>' +
-                '<path d="M50 56h60M50 72h52M50 88h40" stroke="var(--secondary)" stroke-width="2.2" stroke-linecap="round"/>' +
-                '<path d="M104 94l16-16 6 6-16 16-8 2 2-8Z" stroke="currentColor" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.25" stroke-linejoin="round"/>' +
-              '</svg>' +
-            '</div>' +
-            '<div class="alan-about-content">' +
-              '<h3 class="alan-about-title">Why This Garden?</h3>' +
-              '<p class="alan-about-text">看过的论文、读过的源码和踩过的坑如果不系统整理很容易遗忘。我把笔记按主题目录沉淀成这座可检索的数字花园——只求脉络清晰、随时可翻阅，也希望能给同路人带来一点参考。</p>' +
-              '<div class="alan-about-action">' +
-                '<a href="#alan-directories" class="alan-flat-btn" data-router-ignore="true" data-alan-scroll="directories">Explore Directories →</a>' +
-              '</div>' +
-            '</div>' +
-          '</article>' +
-        '</div>' +
-        '<button type="button" class="alan-carousel-btn alan-carousel-next" aria-label="下一张卡片" title="下一张">' +
-          '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>' +
-        '</button>' +
+      '<p class="alan-section-subtitle">Keep it simple · 第一性原理拆解计算机系统与编译技术</p>' +
+      '<div class="alan-about-grid">' +
+        '<article class="alan-about-card">' +
+          '<div class="alan-about-art" aria-hidden="true">' +
+            '<svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+              '<circle cx="80" cy="60" r="44" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 5" opacity="0.65"/>' +
+              '<circle cx="80" cy="60" r="30" stroke="var(--secondary)" stroke-width="2" fill="var(--secondary)" fill-opacity="0.1"/>' +
+              '<path d="M80 22l9 29 29 9-29 9-9 29-9-29-29-9 29-9 9-29Z" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18" stroke-linejoin="round"/>' +
+              '<circle cx="80" cy="60" r="4.5" fill="var(--dark)"/>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="alan-about-content">' +
+            '<h3 class="alan-about-title">Explorer</h3>' +
+            '<p class="alan-about-text">保持好奇心的底层技术探索者，习惯用第一性原理把复杂的系统拆解清楚，持续记录对计算机体系结构、编译技术与系统性能的思考。</p>' +
+          '</div>' +
+        '</article>' +
+        '<article class="alan-about-card">' +
+          '<div class="alan-about-art" aria-hidden="true">' +
+            '<svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+              '<rect x="20" y="20" width="120" height="80" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
+              '<rect x="34" y="34" width="38" height="20" rx="5" stroke="var(--secondary)" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.18"/>' +
+              '<rect x="88" y="34" width="38" height="20" rx="5" stroke="currentColor" stroke-width="1.8"/>' +
+              '<rect x="34" y="64" width="92" height="20" rx="5" stroke="var(--tertiary)" stroke-width="1.8" fill="var(--tertiary)" fill-opacity="0.16"/>' +
+              '<path d="M72 44h16M80 54v10" stroke="var(--secondary)" stroke-width="1.8" stroke-linecap="round"/>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="alan-about-content">' +
+            '<h3 class="alan-about-title">Compilers &amp; Systems</h3>' +
+            '<p class="alan-about-text">研究与实践围绕 LLVM / MLIR 多级中间表示、TableGen 与代码生成、程序性能优化（Cache 局部性与矩阵乘法调优）、RISC-V RVV 向量扩展与 LLM 底层系统展开。</p>' +
+          '</div>' +
+        '</article>' +
+        '<article class="alan-about-card">' +
+          '<div class="alan-about-art" aria-hidden="true">' +
+            '<svg viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+              '<rect x="34" y="16" width="92" height="88" rx="12" stroke="currentColor" stroke-width="1.8" fill="currentColor" fill-opacity="0.06"/>' +
+              '<circle cx="80" cy="28" r="4.5" fill="var(--light)" stroke="currentColor" stroke-width="1.6"/>' +
+              '<path d="M50 48h60M50 64h52M50 80h40" stroke="var(--secondary)" stroke-width="2.2" stroke-linecap="round"/>' +
+              '<path d="M104 84l14-14 5 5-14 14-7 2 2-7Z" stroke="currentColor" stroke-width="1.8" fill="var(--secondary)" fill-opacity="0.25" stroke-linejoin="round"/>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="alan-about-content">' +
+            '<h3 class="alan-about-title">Why This Garden?</h3>' +
+            '<p class="alan-about-text">看过的论文、读过的源码和踩过的坑若不系统梳理很快遗忘。这里按专题沉淀成可检索的数字花园，只求脉络清晰、随时可查，也给同路人提供参考。</p>' +
+          '</div>' +
+        '</article>' +
       '</div>' +
-      '<div class="alan-carousel-dots" role="tablist" aria-label="About 卡片导航">' +
-        '<button type="button" class="alan-carousel-dot is-active" data-slide-to="0" aria-label="第 1 张卡片"></button>' +
-        '<button type="button" class="alan-carousel-dot" data-slide-to="1" aria-label="第 2 张卡片"></button>' +
-        '<button type="button" class="alan-carousel-dot" data-slide-to="2" aria-label="第 3 张卡片"></button>' +
+      '<div class="alan-about-footer-cta">' +
+        '<a href="#alan-directories" class="alan-flat-btn" data-router-ignore="true" data-alan-slide="2">Explore Directories →</a>' +
       '</div>';
 
-    var deck = sec.querySelector(".alan-about-deck");
-    var cards = Array.from(sec.querySelectorAll(".alan-about-card"));
-    var dots = Array.from(sec.querySelectorAll(".alan-carousel-dot"));
-    var prevBtn = sec.querySelector(".alan-carousel-prev");
-    var nextBtn = sec.querySelector(".alan-carousel-next");
-    var activeIdx = 0;
-
-    function scrollToCard(idx) {
-      if (!deck || cards.length === 0) return;
-      var wrapped = ((idx % cards.length) + cards.length) % cards.length;
-      var card = cards[wrapped];
-      var targetLeft = card.offsetLeft - (deck.clientWidth - card.clientWidth) / 2;
-      deck.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
-    }
-
-    function syncCarouselState() {
-      if (!deck || cards.length === 0) return;
-      var centerX = deck.scrollLeft + deck.clientWidth / 2;
-      var bestIdx = 0;
-      var bestDist = Infinity;
-      cards.forEach(function (card, idx) {
-        var cardCenter = card.offsetLeft + card.clientWidth / 2;
-        var dist = Math.abs(centerX - cardCenter);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIdx = idx;
-        }
-      });
-      activeIdx = bestIdx;
-      cards.forEach(function (card, idx) {
-        if (idx === bestIdx) {
-          card.classList.add("is-active");
-        } else {
-          card.classList.remove("is-active");
-        }
-      });
-      dots.forEach(function (dot, idx) {
-        if (idx === bestIdx) {
-          dot.classList.add("is-active");
-        } else {
-          dot.classList.remove("is-active");
-        }
-      });
-    }
-
-    if (deck) {
-      var rafPending = false;
-      deck.addEventListener(
-        "scroll",
-        function () {
-          if (!rafPending) {
-            rafPending = true;
-            window.requestAnimationFrame(function () {
-              syncCarouselState();
-              rafPending = false;
-            });
-          }
-        },
-        { passive: true }
-      );
-
-      cards.forEach(function (card, idx) {
-        card.addEventListener("click", function (e) {
-          if (e.target && e.target.closest && e.target.closest("a, button")) return;
-          if (idx !== activeIdx) scrollToCard(idx);
-        });
-      });
-
-      var isDragging = false;
-      var startX = 0;
-      var startScroll = 0;
-      deck.addEventListener("mousedown", function (e) {
-        if (e.button !== 0) return;
-        if (e.target && e.target.closest && e.target.closest("a, button")) return;
-        isDragging = true;
-        startX = e.pageX;
-        startScroll = deck.scrollLeft;
-        deck.classList.add("is-dragging");
-      });
-      window.addEventListener("mousemove", function (e) {
-        if (!isDragging) return;
-        var dx = e.pageX - startX;
-        deck.scrollLeft = startScroll - dx;
-      });
-      window.addEventListener("mouseup", function () {
-        if (!isDragging) return;
-        isDragging = false;
-        deck.classList.remove("is-dragging");
-      });
-
-      deck.addEventListener("keydown", function (e) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          scrollToCard(activeIdx - 1);
-        } else if (e.key === "ArrowRight") {
-          e.preventDefault();
-          scrollToCard(activeIdx + 1);
-        }
-      });
-    }
-
-    if (prevBtn) {
-      prevBtn.addEventListener("click", function () {
-        scrollToCard(activeIdx - 1);
-      });
-    }
-    if (nextBtn) {
-      nextBtn.addEventListener("click", function () {
-        scrollToCard(activeIdx + 1);
-      });
-    }
-    dots.forEach(function (dot) {
-      dot.addEventListener("click", function () {
-        var idx = parseInt(dot.getAttribute("data-slide-to") || "0", 10);
-        scrollToCard(idx);
-      });
-    });
-
-    var btn = sec.querySelector('[data-alan-scroll="directories"]');
-    if (btn) {
-      btn.addEventListener("click", function (e) {
+    var ctaBtn = inner.querySelector('[data-alan-slide="2"]');
+    if (ctaBtn) {
+      ctaBtn.addEventListener("click", function (e) {
         e.preventDefault();
-        var dirSec = document.getElementById("alan-directories");
-        if (dirSec) dirSec.scrollIntoView({ behavior: "smooth", block: "start" });
+        goToHomeSlide(2, true);
       });
     }
+    return inner;
+  }
 
-    window.requestAnimationFrame(function () {
-      scrollToCard(0);
-      syncCarouselState();
-    });
-    return sec;
+  function buildNotesPortalSection() {
+    var inner = document.createElement("div");
+    inner.className = "alan-slide-inner alan-notes-inner";
+    inner.innerHTML =
+      '<h2 class="alan-section-title">Notes</h2>' +
+      '<p class="alan-section-subtitle">体系结构、编译原理与高性能计算笔记库——点击下方入口直达完整专题目录</p>' +
+      '<div class="alan-notes-portal-card">' +
+        '<div class="alan-notes-portal-art" aria-hidden="true">' +
+          '<svg viewBox="0 0 180 140" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+            '<rect x="26" y="22" width="44" height="96" rx="8" stroke="currentColor" stroke-width="1.9" fill="currentColor" fill-opacity="0.06"/>' +
+            '<rect x="68" y="14" width="48" height="104" rx="8" stroke="var(--secondary)" stroke-width="2.2" fill="var(--secondary)" fill-opacity="0.14"/>' +
+            '<rect x="114" y="24" width="42" height="94" rx="8" stroke="var(--tertiary)" stroke-width="1.9" fill="var(--tertiary)" fill-opacity="0.1"/>' +
+            '<path d="M36 44h24M36 60h18M78 40h28M78 56h22M78 72h26M124 46h22M124 62h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
+            '<circle cx="92" cy="96" r="5" fill="var(--secondary)"/>' +
+          '</svg>' +
+        '</div>' +
+        '<div class="alan-notes-portal-body">' +
+          '<p class="alan-dir-kicker">NOTES · DIGITAL GARDEN</p>' +
+          '<h3 class="alan-notes-portal-title">进入专题笔记目录</h3>' +
+          '<p class="alan-notes-portal-desc">为保持主页简洁，各子专题与具体文章均统一收纳在目录页内：包含计算机体系结构（Arch）、LLVM / MLIR 编译器、程序性能优化（Opt）、RISC-V RVV 向量扩展与 LLM 底层实践，共 6 个子目录、10 篇技术笔记。</p>' +
+          '<ul class="alan-dir-tags">' +
+            '<li class="alan-dir-tag-primary">6 个子目录 · 共 10 篇</li>' +
+            '<li>Arch · LLM</li>' +
+            '<li>LLVM · MLIR</li>' +
+            '<li>Opt · RISCV</li>' +
+          '</ul>' +
+          '<div class="alan-notes-portal-actions">' +
+            '<a href="./notes/" class="alan-flat-btn">进入 Notes 详细目录 →</a>' +
+            '<a href="./tutorials/" class="alan-outline-btn">Tutorials</a>' +
+            '<a href="./skills/" class="alan-outline-btn">Skills</a>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    return inner;
+  }
+
+  function bindStageSwipe(stage) {
+    if (!stage || stage.__alanSwipeBound) return;
+    stage.__alanSwipeBound = true;
+
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var touchIgnore = false;
+
+    stage.addEventListener(
+      "touchstart",
+      function (e) {
+        if (e.touches.length !== 1) return;
+        var target = e.target;
+        touchIgnore = Boolean(target && target.closest && target.closest(".graph-outer, .global-graph-outer"));
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      },
+      { passive: true }
+    );
+
+    stage.addEventListener(
+      "touchend",
+      function (e) {
+        if (touchIgnore || !e.changedTouches || e.changedTouches.length === 0) return;
+        var dx = e.changedTouches[0].clientX - touchStartX;
+        var dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+          var cur = window.__alanHomeSlide || 0;
+          if (dx < 0 && cur < HOME_SLIDES.length - 1) {
+            goToHomeSlide(cur + 1, true);
+          } else if (dx > 0 && cur > 0) {
+            goToHomeSlide(cur - 1, true);
+          }
+        }
+      },
+      { passive: true }
+    );
+
+    var wheelLockedUntil = 0;
+    stage.addEventListener(
+      "wheel",
+      function (e) {
+        var target = e.target;
+        if (target && target.closest && target.closest(".graph-outer, .global-graph-outer")) return;
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 26) {
+          e.preventDefault();
+          var now = Date.now();
+          if (now < wheelLockedUntil) return;
+          wheelLockedUntil = now + 450;
+          var cur = window.__alanHomeSlide || 0;
+          if (e.deltaX > 0 && cur < HOME_SLIDES.length - 1) {
+            goToHomeSlide(cur + 1, true);
+          } else if (e.deltaX < 0 && cur > 0) {
+            goToHomeSlide(cur - 1, true);
+          }
+        }
+      },
+      { passive: false }
+    );
   }
 
   function enhanceHomepage() {
@@ -548,6 +634,7 @@ const ALAN_CLIENT_SCRIPT = `
 
     if (!isHome) {
       document.body.classList.remove("alan-enhanced");
+      updateScrollEffects();
       return;
     }
 
@@ -556,80 +643,83 @@ const ALAN_CLIENT_SCRIPT = `
     var md = article ? article.querySelector(".markdown-rendered") || article : null;
     if (!center || !article || !md) return;
 
-    if (!document.getElementById("alan-intro")) {
-      var children = Array.from(md.children);
-      for (var i = 0; i < children.length; i++) {
-        if (children[i].tagName === "H2") break;
-        if (children[i].tagName === "P" && children[i].textContent.trim().length > 0) {
-          children[i].classList.add("alan-moved-intro");
-          break;
-        }
-      }
+    var stage = document.getElementById("alan-stage");
+    if (!stage) {
+      stage = document.createElement("section");
+      stage.id = "alan-stage";
+      stage.setAttribute("aria-label", "Homepage Horizontal Sections");
 
-      var intro = document.createElement("section");
-      intro.id = "alan-intro";
-      intro.setAttribute("aria-label", "Introduction");
-      intro.innerHTML =
-        '<div class="alan-intro-inner">' +
-          '<div id="alan-intro-text">' +
-            '<div id="alan-intro-salutation">Hi, I\\'m</div>' +
-            '<h1 id="alan-intro-name">kaishaoshao</h1>' +
-            '<div id="alan-intro-tag-line">I compile &amp; explore here</div>' +
-          '</div>' +
-          '<div class="alan-intro-visual" aria-hidden="true">' +
-            '<div id="alan-intro-star">' +
-              '<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-                '<circle cx="120" cy="120" r="106" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 7" opacity="0.6"/>' +
-                '<circle cx="120" cy="120" r="76" stroke="currentColor" stroke-width="1" opacity="0.4"/>' +
-                '<path d="M120 8 L130 86 L184 30 L144 98 L226 76 L154 116 L232 120 L154 124 L226 164 L144 142 L184 210 L130 154 L120 232 L110 154 L56 210 L96 142 L14 164 L86 124 L8 120 L86 116 L14 76 L96 98 L56 30 L110 86 Z" fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' +
-              '</svg>' +
+      var track = document.createElement("div");
+      track.id = "alan-track";
+
+      /* Slide 0: Intro */
+      var slide0 = document.createElement("section");
+      slide0.className = "alan-slide";
+      slide0.id = "alan-intro";
+      slide0.setAttribute("data-slide-idx", "0");
+      slide0.setAttribute("aria-label", "Introduction");
+      slide0.innerHTML =
+        '<div class="alan-slide-inner alan-intro-slide">' +
+          '<div class="alan-intro-inner">' +
+            '<div id="alan-intro-text">' +
+              '<div id="alan-intro-salutation">Hi, I\\'m</div>' +
+              '<h1 id="alan-intro-name">kaishaoshao</h1>' +
+              '<div id="alan-intro-tag-line">I compile &amp; explore here</div>' +
             '</div>' +
-            '<div id="alan-intro-emblem">' +
-              '<div class="alan-emblem-card">' +
-                '<span class="alan-emblem-dot"></span>' +
-                '<span class="alan-emblem-code">IR → Lowering → ASM</span>' +
+            '<div class="alan-intro-visual" aria-hidden="true">' +
+              '<div id="alan-intro-star">' +
+                '<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                  '<circle cx="120" cy="120" r="106" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 7" opacity="0.6"/>' +
+                  '<circle cx="120" cy="120" r="76" stroke="currentColor" stroke-width="1" opacity="0.4"/>' +
+                  '<path d="M120 8 L130 86 L184 30 L144 98 L226 76 L154 116 L232 120 L154 124 L226 164 L144 142 L184 210 L130 154 L120 232 L110 154 L56 210 L96 142 L14 164 L86 124 L8 120 L86 116 L14 76 L96 98 L56 30 L110 86 Z" fill="currentColor" fill-opacity="0.18" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>' +
+                '</svg>' +
+              '</div>' +
+              '<div id="alan-intro-emblem">' +
+                '<div class="alan-emblem-card">' +
+                  '<span class="alan-emblem-dot"></span>' +
+                  '<span class="alan-emblem-code">IR → Lowering → ASM</span>' +
+                '</div>' +
               '</div>' +
             '</div>' +
           '</div>' +
-        '</div>' +
-        '<a href="#alan-about" id="alan-scroll-cue" data-router-ignore="true">' +
-          '<span>Scroll to explore</span>' +
-          '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>' +
-        '</a>';
+          '<a href="#alan-about" id="alan-scroll-cue" data-router-ignore="true" data-alan-slide="1">' +
+            '<span>Explore About</span>' +
+            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>' +
+          '</a>' +
+        '</div>';
 
-      var cue = intro.querySelector("#alan-scroll-cue");
+      var cue = slide0.querySelector("#alan-scroll-cue");
       if (cue) {
         cue.addEventListener("click", function (e) {
           e.preventDefault();
-          var target = document.getElementById("alan-about");
-          if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+          goToHomeSlide(1, true);
         });
       }
+      track.appendChild(slide0);
 
-      center.insertBefore(intro, article);
-    }
+      /* Slide 1: About */
+      var slide1 = document.createElement("section");
+      slide1.className = "alan-slide";
+      slide1.id = "alan-about";
+      slide1.setAttribute("data-slide-idx", "1");
+      slide1.setAttribute("aria-label", "About");
+      slide1.appendChild(buildAboutSection());
+      track.appendChild(slide1);
 
-    if (!document.getElementById("alan-about")) {
-      var aboutSec = buildAboutSection();
-      center.insertBefore(aboutSec, article);
-    }
+      /* Slide 2: Directories */
+      var slide2 = document.createElement("section");
+      slide2.className = "alan-slide";
+      slide2.id = "alan-directories";
+      slide2.setAttribute("data-slide-idx", "2");
+      slide2.setAttribute("aria-label", "Directories");
 
-    if (!md.querySelector("#alan-directories")) {
-      var headings = Array.from(md.querySelectorAll("h2"));
-      var dirSection = document.createElement("section");
-      dirSection.id = "alan-directories";
-      dirSection.setAttribute("aria-label", "Directories");
-
-      if (headings.length > 0) {
-        headings[0].classList.add("alan-moved-intro");
-      }
-
-      var headerWrap = document.createElement("div");
-      headerWrap.className = "alan-dir-header";
-      headerWrap.innerHTML =
-        '<h2 class="alan-section-title">Directories</h2>' +
-        '<p class="alan-section-subtitle">按专题目录浏览体系结构、编译器、高性能计算、大模型笔记与实用指南</p>';
-      dirSection.appendChild(headerWrap);
+      var dirInner = document.createElement("div");
+      dirInner.className = "alan-slide-inner alan-directories-inner";
+      dirInner.innerHTML =
+        '<div class="alan-dir-header">' +
+          '<h2 class="alan-section-title">Directories</h2>' +
+          '<p class="alan-section-subtitle">按专题目录浏览体系结构、编译器、高性能计算、大模型笔记与实用指南</p>' +
+        '</div>';
 
       function buildCardFromLi(li) {
         var anchor = li.querySelector("a");
@@ -712,62 +802,114 @@ const ALAN_CLIENT_SCRIPT = `
         return card;
       }
 
-      var h3s = Array.from(md.querySelectorAll("h3"));
-      if (h3s.length > 0) {
-        h3s.forEach(function (h3) {
-          var next = h3.nextElementSibling;
-          if (!next || next.tagName !== "UL") return;
-
-          var secName = (h3.textContent || "").trim();
-          var items = Array.from(next.querySelectorAll("li"));
-          if (items.length === 0) return;
-
-          var groupTitle = document.createElement("div");
-          groupTitle.className = "alan-dir-group-label";
-          groupTitle.textContent = secName;
-          dirSection.appendChild(groupTitle);
-
-          var grid = document.createElement("div");
-          grid.className = items.length >= 3 ? "alan-dir-grid" : "alan-dir-grid alan-dir-grid-compact";
-          items.forEach(function (li) {
-            var card = buildCardFromLi(li);
-            if (card) grid.appendChild(card);
-          });
-
-          dirSection.appendChild(grid);
-          h3.classList.add("alan-moved-intro");
-          next.classList.add("alan-moved-intro");
+      var directLists = Array.from(md.querySelectorAll("ul"));
+      directLists.forEach(function (ul) {
+        var items = Array.from(ul.querySelectorAll("li"));
+        if (items.length === 0) return;
+        var grid = document.createElement("div");
+        grid.className = items.length >= 3 ? "alan-dir-grid" : "alan-dir-grid alan-dir-grid-compact";
+        items.forEach(function (li) {
+          var card = buildCardFromLi(li);
+          if (card) grid.appendChild(card);
         });
-      } else {
-        var directLists = Array.from(md.querySelectorAll("ul"));
-        directLists.forEach(function (ul) {
-          var items = Array.from(ul.querySelectorAll("li"));
-          if (items.length === 0) return;
-          var grid = document.createElement("div");
-          grid.className = items.length >= 3 ? "alan-dir-grid" : "alan-dir-grid alan-dir-grid-compact";
-          items.forEach(function (li) {
-            var card = buildCardFromLi(li);
-            if (card) grid.appendChild(card);
-          });
-          dirSection.appendChild(grid);
-          ul.classList.add("alan-moved-intro");
-        });
+        dirInner.appendChild(grid);
+      });
+
+      slide2.appendChild(dirInner);
+      track.appendChild(slide2);
+
+      /* Slide 3: Graph */
+      var slide3 = document.createElement("section");
+      slide3.className = "alan-slide";
+      slide3.id = "alan-graph-slide";
+      slide3.setAttribute("data-slide-idx", "3");
+      slide3.setAttribute("aria-label", "Knowledge Graph");
+
+      var graphInner = document.createElement("div");
+      graphInner.className = "alan-slide-inner alan-graph-inner";
+
+      var pageFooter = center.querySelector(".page-footer");
+      if (pageFooter && pageFooter.querySelector(".graph")) {
+        pageFooter.id = "alan-graph";
+        if (!pageFooter.querySelector(".alan-graph-heading")) {
+          var gHeader = document.createElement("div");
+          gHeader.className = "alan-graph-header";
+          gHeader.innerHTML =
+            '<h2 class="alan-section-title alan-graph-heading">Knowledge Graph</h2>' +
+            '<p class="alan-section-subtitle alan-graph-subtitle">全站目录、文章与标签关系网络（支持节点拖拽、滚轮缩放与全屏展开）</p>';
+          pageFooter.insertBefore(gHeader, pageFooter.firstChild);
+        }
+        graphInner.appendChild(pageFooter);
       }
+      slide3.appendChild(graphInner);
+      track.appendChild(slide3);
 
-      md.appendChild(dirSection);
-    }
+      /* Slide 4: Notes Portal */
+      var slide4 = document.createElement("section");
+      slide4.className = "alan-slide";
+      slide4.id = "alan-notes";
+      slide4.setAttribute("data-slide-idx", "4");
+      slide4.setAttribute("aria-label", "Notes");
+      slide4.appendChild(buildNotesPortalSection());
+      track.appendChild(slide4);
 
-    var pageFooter = center.querySelector(".page-footer");
-    if (pageFooter && pageFooter.querySelector(".graph") && !pageFooter.querySelector(".alan-graph-heading")) {
-      pageFooter.id = "alan-graph";
-      var gTitle = document.createElement("h2");
-      gTitle.className = "alan-section-title alan-graph-heading";
-      gTitle.textContent = "Knowledge Graph";
-      pageFooter.insertBefore(gTitle, pageFooter.firstChild);
+      stage.appendChild(track);
+
+      /* Left / Right Stage Controls + Bottom Slide Pills */
+      var prevCtrl = document.createElement("button");
+      prevCtrl.type = "button";
+      prevCtrl.id = "alan-stage-prev";
+      prevCtrl.className = "alan-stage-arrow alan-stage-prev";
+      prevCtrl.innerHTML =
+        '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>';
+      prevCtrl.addEventListener("click", function () {
+        goToHomeSlide((window.__alanHomeSlide || 0) - 1, true);
+      });
+
+      var nextCtrl = document.createElement("button");
+      nextCtrl.type = "button";
+      nextCtrl.id = "alan-stage-next";
+      nextCtrl.className = "alan-stage-arrow alan-stage-next";
+      nextCtrl.innerHTML =
+        '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>';
+      nextCtrl.addEventListener("click", function () {
+        goToHomeSlide((window.__alanHomeSlide || 0) + 1, true);
+      });
+
+      var dotsNav = document.createElement("div");
+      dotsNav.id = "alan-stage-dots";
+      dotsNav.setAttribute("role", "tablist");
+      dotsNav.setAttribute("aria-label", "页面横向切换导航");
+      HOME_SLIDES.forEach(function (s, idx) {
+        var dotBtn = document.createElement("button");
+        dotBtn.type = "button";
+        dotBtn.className = "alan-stage-dot" + (idx === 0 ? " is-active" : "");
+        dotBtn.setAttribute("role", "tab");
+        dotBtn.setAttribute("data-alan-slide", String(idx));
+        dotBtn.setAttribute("aria-selected", idx === 0 ? "true" : "false");
+        dotBtn.innerHTML = '<span class="alan-dot-pip"></span><span class="alan-dot-label">' + s.label + '</span>';
+        dotBtn.addEventListener("click", function () {
+          goToHomeSlide(idx, true);
+        });
+        dotsNav.appendChild(dotBtn);
+      });
+
+      stage.appendChild(prevCtrl);
+      stage.appendChild(nextCtrl);
+      stage.appendChild(dotsNav);
+
+      article.classList.add("alan-moved-article");
+      center.insertBefore(stage, article);
+      bindStageSwipe(stage);
+
+      var initialSlide = resolveInitialHomeSlide();
+      window.requestAnimationFrame(function () {
+        goToHomeSlide(initialSlide, false);
+      });
     }
 
     document.body.classList.add("alan-enhanced");
-    updateScrollEffects();
+    syncHomeSlideUI(window.__alanHomeSlide || 0);
   }
 
   function dedupeArticleHeading() {

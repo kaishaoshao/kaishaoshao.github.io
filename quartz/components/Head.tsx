@@ -221,13 +221,14 @@ const ALAN_CLIENT_SCRIPT = `
     var total = HOME_SLIDES.length;
     var safeIdx = Math.max(0, Math.min(total - 1, idx));
     var stage = document.getElementById("alan-stage");
+    var viewport = document.getElementById("alan-viewport") || stage;
     syncHomeSlideUI(safeIdx);
-    if (stage) {
-      var targetLeft = safeIdx * stage.clientWidth;
-      stage.scrollTo({ left: targetLeft, behavior: animate === false ? "auto" : "smooth" });
+    if (viewport) {
+      var targetLeft = safeIdx * viewport.clientWidth;
+      viewport.scrollTo({ left: targetLeft, behavior: animate === false ? "auto" : "smooth" });
       if (safeIdx === 3) {
         window.requestAnimationFrame(function () {
-          var gc = stage.querySelector("#alan-graph .graph-container");
+          var gc = viewport.querySelector("#alan-graph .graph-container");
           var cv = gc ? gc.querySelector("canvas") : null;
           if (gc && (!cv || cv.width === 0 || Math.abs(cv.getBoundingClientRect().width - gc.clientWidth) > 24)) {
             document.dispatchEvent(new CustomEvent("render"));
@@ -362,10 +363,10 @@ const ALAN_CLIENT_SCRIPT = `
 
     window.addEventListener("resize", function () {
       if (!document.body || document.body.getAttribute("data-slug") !== "index") return;
-      var stage = document.getElementById("alan-stage");
-      if (stage) {
+      var viewport = document.getElementById("alan-viewport") || document.getElementById("alan-stage");
+      if (viewport) {
         var idx = window.__alanHomeSlide || 0;
-        stage.scrollTo({ left: idx * stage.clientWidth, behavior: "auto" });
+        viewport.scrollTo({ left: idx * viewport.clientWidth, behavior: "auto" });
       }
     });
 
@@ -853,7 +854,10 @@ const ALAN_CLIENT_SCRIPT = `
       slide4.appendChild(buildNotesPortalSection());
       track.appendChild(slide4);
 
-      stage.appendChild(track);
+      var viewport = document.createElement("div");
+      viewport.id = "alan-viewport";
+      viewport.appendChild(track);
+      stage.appendChild(viewport);
 
       /* Left / Right Stage Controls + Bottom Slide Pills */
       var prevCtrl = document.createElement("button");

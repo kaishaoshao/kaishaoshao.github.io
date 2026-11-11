@@ -7,19 +7,19 @@ title: kaishaoshao的个人空间 🌱
 ## 🪴 归档文章
 
 
-### Tutorials
-
-- [[tutorials/hello-quartz|Hello Quartz]]：tutorials/hello-quartz.md
-- [[tutorials/hello-world|Hello Hexo]]：tutorials/hello-world.md
-
 ### Notes
 
-- [[notes/Arch/体系结构常见名词|体系结构常见名词表]]：notes/Arch/体系结构常见名词.md
-- [[notes/MLIR/mlir_tablegen_note-1|TableGen Basic 01]]：notes/MLIR/mlir_tablegen_note-1.md
-- [[notes/Opt/02-程序性能优化之矩阵乘法-1|程序性能优化之矩阵乘法(1)]]：notes/Opt/02-程序性能优化之矩阵乘法-1.md
-- [[notes/RISCV/03-riscv-rvv学习-1|riscv rvv 学习-1]]：notes/RISCV/03-riscv-rvv学习-1.md
-- [[notes/LLM/Zero-To-Hero|Zero to Hero]]：notes/LLM/Zero-To-Hero.md
+- [Arch/](./notes/arch/)：计算机体系结构核心脉络整理，涵盖 ISA、流水线、分支预测、乱序执行、Cache 与虚拟内存等常见名词（共 1 篇）
+- [LLM/](./notes/llm/)：大语言模型底层原理与工程实现笔记，包含 Zero to Hero 从零搭建训练体系记录（共 1 篇）
+- [LLVM/](./notes/llvm/)：LLVM 编译器后端架构与代码生成（Code Generation）方向学习笔记（整理中，2 篇占位）
+- [MLIR/](./notes/mlir/)：MLIR 多级中间表示学习记录，涵盖 TableGen 数据定义语言基础与工具链实践（共 3 篇）
+- [Opt/](./notes/opt/)：程序性能优化方法论与实战分析，包含多级性能瓶颈定位及矩阵乘法调优笔记（共 2 篇）
+- [RISCV/](./notes/riscv/)：RISC-V 体系结构与 RVV 向量指令集扩展（SISD/SIMD）基础概念与编程入门（共 1 篇）
+
+### Tutorials
+
+- [Tutorials/](./tutorials/)：博客搭建与写作入门教程，涵盖 Quartz v5 站点配置及 Hexo 迁移使用指南（共 2 篇）
 
 ### Skills
 
-- [[skills/compiler|编译器与工作工具链地址导航]]：skills/compiler.md
+- [Skills/](./skills/)：编译器与底层开发工作工具链导航，收录 LLVM、MLIR、GCC 与 RISC-V/ARM 交叉编译资源（共 1 篇）

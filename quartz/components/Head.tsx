@@ -265,7 +265,20 @@ const ALAN_CLIENT_SCRIPT = `
         var meta = document.createElement("div");
         meta.className = "alan-card-kicker";
         var count = next.querySelectorAll("li").length;
-        meta.textContent = "SECTION · 0" + cardIdx + " · " + count + (count === 1 ? " ENTRY" : " ENTRIES");
+        var isDirCard = Array.from(next.querySelectorAll("li a")).every(function (a) {
+          return (a.getAttribute("href") || "").endsWith("/");
+        });
+        var unit = isDirCard
+          ? count === 1
+            ? " DIR"
+            : " DIRS"
+          : count === 1
+            ? " ENTRY"
+            : " ENTRIES";
+        meta.textContent = "SECTION · 0" + cardIdx + " · " + count + unit;
+        if (count >= 4) {
+          card.classList.add("alan-card-wide");
+        }
 
         h3.classList.add("alan-card-title");
         next.classList.add("alan-card-list");

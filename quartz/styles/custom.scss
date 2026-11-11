@@ -1083,6 +1083,22 @@ article h2.alan-section-heading {
   margin: 0.5rem 0 1.5rem;
 }
 
+.alan-card.alan-card-wide {
+  grid-column: 1 / -1;
+
+  ul.alan-card-list {
+    @media all and (min-width: 680px) {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.35rem 1.5rem;
+
+      li {
+        padding: 0.55rem 0;
+      }
+    }
+  }
+}
+
 .alan-card {
   position: relative;
   display: flex;
@@ -1172,6 +1188,11 @@ article h2.alan-section-heading {
       color: var(--dark);
       line-height: 1.38;
 
+      &[href$="/"]::before {
+        content: "📁 ";
+        font-size: 0.86em;
+      }
+
       &:hover {
         color: var(--secondary);
       }
@@ -1180,10 +1201,12 @@ article h2.alan-section-heading {
 }
 
 .alan-item-path {
-  font-family: var(--codeFont);
-  font-size: 0.72rem;
-  color: var(--gray);
-  word-break: break-all;
+  font-family: var(--uiFont);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--darkgray);
+  opacity: 0.86;
+  word-break: normal;
 }
 
 .alan-card-footer {

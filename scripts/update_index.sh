@@ -1,29 +1,23 @@
 #!/usr/bin/env bash
-# scripts/update_index.sh – 自动同步 content/index.md 与仓库精选/最近文章列表
-# 用法: ./scripts/update_index.sh [每个分类最多展示条数，默认 5；传入 0 表示不限制]
-# 在新增、删除或移动 *.md 文件后执行，即可保持首页列表简洁且最新。
+# scripts/update_index.sh – 自动同步 content/index.md 首页归档目录与内容介绍
+# 用法: ./scripts/update_index.sh
+# 仅展示各板块下的目录及其内容简介，不直接罗列单个文档。
 
 set -euo pipefail
 
 # 项目根目录（脚本所在目录的上级）
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SECTIONS=("tutorials" "notes" "skills")
+SECTIONS=("notes" "tutorials" "skills")
 INDEX_FILE="${ROOT_DIR}/content/index.md"
-MAX_ITEMS="${1:-5}"
-MIN_BODY_CHARS="${MIN_BODY_CHARS:-40}"
 
-python3 - "${ROOT_DIR}" "${INDEX_FILE}" "${MAX_ITEMS}" "${MIN_BODY_CHARS}" "${SECTIONS[@]}" <<'PY'
+python3 - "${ROOT_DIR}" "${INDEX_FILE}" "${SECTIONS[@]}" <<'PY'
 import os
 import re
-import subprocess
 import sys
-from datetime import datetime
 
 root_dir = sys.argv[1]
 index_file = sys.argv[2]
-max_items = int(sys.argv[3])
-min_body_chars = int(sys.argv[4])
-sections = sys.argv[5:]
+sections = sys.argv[3:]
 content_dir = os.path.join(root_dir, "content")
 
 header = """---
@@ -34,37 +28,29 @@ title: kaishaoshao的个人空间 🌱
 
 ## 🪴 归档文章"""
 
-
-def get_git_timestamp(path: str) -> float:
-    try:
-        out = subprocess.check_output(
-            ["git", "-C", root_dir, "log", "-1", "--format=%ct", "--", path],
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ).strip()
-        if out:
-            return float(out)
-    except Exception:
-        pass
-    return os.path.getmtime(path)
+# 各目录内容介绍（若目录下存在 index.md 且配置了 description，则优先使用其 frontmatter description）
+DIR_DESCRIPTIONS = {
+    "notes/Arch": "计算机体系结构核心脉络整理，涵盖 ISA、流水线、分支预测、乱序执行、Cache 与虚拟内存等常见名词",
+    "notes/LLM": "大语言模型底层原理与工程实现笔记，包含 Zero to Hero 从零搭建训练体系记录",
+    "notes/LLVM": "LLVM 编译器后端架构与代码生成（Code Generation）方向学习笔记",
+    "notes/MLIR": "MLIR 多级中间表示学习记录，涵盖 TableGen 数据定义语言基础与工具链实践",
+    "notes/Opt": "程序性能优化方法论与实战分析，包含多级性能瓶颈定位及矩阵乘法调优笔记",
+    "notes/RISCV": "RISC-V 体系结构与 RVV 向量指令集扩展（SISD/SIMD）基础概念与编程入门",
+    "tutorials": "博客搭建与写作入门教程，涵盖 Quartz v5 站点配置及 Hexo 迁移使用指南",
+    "skills": "编译器与底层开发工作工具链导航，收录 LLVM、MLIR、GCC 与 RISC-V/ARM 交叉编译资源",
+}
 
 
-def parse_date_ts(val: str) -> float | None:
-    val = val.strip().strip("'\"")
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-        try:
-            return datetime.strptime(val, fmt).timestamp()
-        except ValueError:
-            pass
-    return None
+def slugify_segment(seg: str) -> str:
+    return seg.strip().lower().replace(" ", "-")
 
 
-def parse_note(path: str):
+def parse_markdown_meta(path: str):
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
 
     fm_title = None
-    fm_date_ts = None
+    fm_desc = None
     is_draft = False
     body = text
 
@@ -85,17 +71,15 @@ def parse_note(path: str):
                     val = val[1:-1].strip()
                 if val:
                     fm_title = val
-            m_date = re.match(r"^\s*date\s*:\s*(.+?)\s*$", line)
-            if m_date:
-                fm_date_ts = parse_date_ts(m_date.group(1))
-
-    if is_draft:
-        return None
-
-    # Skip empty or stub-only placeholder files
-    stripped_body = re.sub(r"[#\s`>*_-]+", "", body)
-    if len(stripped_body) < min_body_chars:
-        return None
+            m_desc = re.match(r"^\s*description\s*:\s*(.+?)\s*$", line)
+            if m_desc:
+                val = m_desc.group(1).strip()
+                if (val.startswith('"') and val.endswith('"')) or (
+                    val.startswith("'") and val.endswith("'")
+                ):
+                    val = val[1:-1].strip()
+                if val:
+                    fm_desc = val
 
     h1_title = None
     if not fm_title:
@@ -106,9 +90,55 @@ def parse_note(path: str):
                 break
 
     fallback_title = os.path.splitext(os.path.basename(path))[0]
-    title = fm_title or h1_title or fallback_title
-    ts = fm_date_ts if fm_date_ts is not None else get_git_timestamp(path)
-    return title, ts
+    stripped_body = re.sub(r"[#\s`>*_-]+", "", body)
+    is_stub = len(stripped_body) < 40
+    return {
+        "title": fm_title or h1_title or fallback_title,
+        "description": fm_desc,
+        "is_draft": is_draft,
+        "is_stub": is_stub,
+    }
+
+
+def collect_dir_info(dir_path: str, key: str):
+    index_md = os.path.join(dir_path, "index.md")
+    custom_desc = None
+    if os.path.isfile(index_md):
+        custom_desc = parse_markdown_meta(index_md)["description"]
+
+    published_titles = []
+    stub_count = 0
+    for root, _, filenames in os.walk(dir_path):
+        for fn in sorted(filenames):
+            if not fn.endswith(".md") or fn == "index.md":
+                continue
+            meta = parse_markdown_meta(os.path.join(root, fn))
+            if meta["is_draft"]:
+                continue
+            if meta["is_stub"]:
+                stub_count += 1
+            else:
+                published_titles.append(meta["title"])
+
+    total_published = len(published_titles) + stub_count
+    if total_published == 0:
+        return None
+
+    desc = custom_desc or DIR_DESCRIPTIONS.get(key)
+    if not desc:
+        if published_titles:
+            preview = "、".join(published_titles[:3])
+            suffix = " 等内容" if len(published_titles) > 3 else ""
+            desc = f"收录 {preview}{suffix}"
+        else:
+            desc = "专题笔记与资料整理中"
+
+    if len(published_titles) == 0 and stub_count > 0:
+        count_note = f"（整理中，{stub_count} 篇占位）"
+    else:
+        count_note = f"（共 {total_published} 篇）"
+
+    return f"{desc}{count_note}"
 
 
 lines = [header, ""]
@@ -118,50 +148,26 @@ for sec in sections:
     if not os.path.isdir(sec_dir):
         continue
 
-    candidates = []
-    for dirpath, _, filenames in os.walk(sec_dir):
-        for fn in sorted(filenames):
-            if not fn.endswith(".md") or fn == "index.md":
-                continue
-            fpath = os.path.join(dirpath, fn)
-            parsed = parse_note(fpath)
-            if parsed is None:
-                continue
-            title, ts = parsed
-            rel_path = os.path.relpath(fpath, content_dir).replace(os.sep, "/")
-            subtopic = rel_path.split("/")[1] if rel_path.count("/") >= 2 else ""
-            candidates.append((ts, subtopic, rel_path, title))
-
-    # Sort newest first, tie-breaking deterministically by path
-    candidates.sort(key=lambda item: (-item[0], item[2]))
-
-    if max_items > 0 and len(candidates) > max_items:
-        # First pass: pick one representative (newest) article per subtopic
-        picked = []
-        seen_topics = set()
-        for item in candidates:
-            if item[1] not in seen_topics:
-                picked.append(item)
-                seen_topics.add(item[1])
-                if len(picked) == max_items:
-                    break
-        # Second pass: fill remaining slots with newest overall
-        if len(picked) < max_items:
-            picked_paths = {item[2] for item in picked}
-            for item in candidates:
-                if item[2] not in picked_paths:
-                    picked.append(item)
-                    if len(picked) == max_items:
-                        break
-        selected = picked
-    else:
-        selected = candidates
+    subdirs = [
+        d
+        for d in sorted(os.listdir(sec_dir))
+        if not d.startswith(".") and os.path.isdir(os.path.join(sec_dir, d))
+    ]
 
     entries = []
-    for _, _, rel_path, title in selected:
-        target = rel_path[:-3] if rel_path.endswith(".md") else rel_path
-        safe_title = title.replace("|", "\\|")
-        entries.append(f"- [[{target}|{safe_title}]]：{rel_path}")
+    if subdirs:
+        for sub in subdirs:
+            sub_path = os.path.join(sec_dir, sub)
+            info = collect_dir_info(sub_path, f"{sec}/{sub}")
+            if not info:
+                continue
+            href = f"./{slugify_segment(sec)}/{slugify_segment(sub)}/"
+            entries.append(f"- [{sub}/]({href})：{info}")
+    else:
+        info = collect_dir_info(sec_dir, sec)
+        if info:
+            href = f"./{slugify_segment(sec)}/"
+            entries.append(f"- [{sec.capitalize()}/]({href})：{info}")
 
     if entries:
         lines.append("")

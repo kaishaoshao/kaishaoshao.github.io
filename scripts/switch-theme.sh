@@ -172,11 +172,19 @@ new_colors = """    colors:
         highlight: "${DARK_HIGHLIGHT}"
         textHighlight: "${DARK_TEXT_HIGHLIGHT}\""""
 
-content = re.sub(r'    colors:\s+lightMode:[\s\S]+?textHighlight:[^\n]+\n', new_colors + '\n', content)
+content, replaced = re.subn(
+    r'^    colors:\n(?: {6,}.*(?:\n|$)|(?: *\n)+(?= {6,}))+',
+    new_colors + '\n',
+    content,
+    count=1,
+    flags=re.MULTILINE,
+)
+if replaced != 1:
+    raise SystemExit("❌ 未能在 quartz.config.yaml 中定位到 theme.colors 配置块")
 
 with open("${CONFIG_FILE}", "w", encoding="utf-8") as f:
     f.write(content)
 EOF
 
 echo "✨ 已将默认主题成功切换为: ${THEME_NAME}"
-echo "💡 提示: 网页前端也已配备 🎨 实时调色盘切换按钮，支持在浏览器中即时预览全部 4 套配色！"
+echo "💡 提示: 网页前端也已配备 🎨 实时调色盘切换按钮，支持在浏览器中即时预览全部 5 套配色！"

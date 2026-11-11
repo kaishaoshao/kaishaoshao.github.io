@@ -5,53 +5,102 @@
 
 set -euo pipefail
 
-# 项目根目录（脚本所在目录的上级）
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SECTIONS=("tutorials" "notes" "skills")
+INDEX_FILE="${ROOT_DIR}/content/index.md"
 
-# 固定头部（可自行编辑）
-HEADER='---
+python3 - "${ROOT_DIR}" "${INDEX_FILE}" "${SECTIONS[@]}" <<'PY'
+import os
+import re
+import sys
+
+root_dir = sys.argv[1]
+index_file = sys.argv[2]
+sections = sys.argv[3:]
+content_dir = os.path.join(root_dir, "content")
+
+header = """---
 title: kaishaoshao的个人空间 🌱
 ---
 欢迎来到我的个人空间！
 这里主要记录我在计算机体系结构、编译器、高性能计算、机器学习底层以及LLM大模型方面的学习笔记与探索。
 
-## 🪴 归档文章'
+## 🪴 归档文章"""
 
-# 固定尾部（如有需要可补充）
-FOOTER=''
 
-# 生成每个子目录的列表
-generate_section() {
-  local section=$1
-  local dir="${ROOT_DIR}/content/${section}"
-  if [[ ! -d "${dir}" ]]; then
-    return
-  fi
-  echo ""
-  echo "### ${section^}"
-  echo ""
-  find "${dir}" -type f -name "*.md" ! -name "index.md" | sort | while read -r file; do
-    # 读取 front‑matter 中的 title
-    local title
-    title=$(grep -m1 '^title:' "${file}" | sed -E 's/^title:[[:space:]]*//')
-    [[ -z "${title}" ]] && title=$(basename "${file}" .md)
-    # 计算相对路径（相对于 content/）
-    local rel_path="${file#${ROOT_DIR}/content/}"
-    echo "- [[${title}|${title}]]：${rel_path}"
-  done
-}
+def parse_note(path: str):
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
 
-INDEX_FILE="${ROOT_DIR}/content/index.md"
+    fm_title = None
+    is_draft = False
+    body = text
 
-{
-  printf "%s\n\n" "${HEADER}"
-  for sec in "${SECTIONS[@]}"; do
-    generate_section "${sec}"
-  done
-  if [[ -n "${FOOTER}" ]]; then
-    printf "\n%s\n" "${FOOTER}"
-  fi
-} > "${INDEX_FILE}"
+    fm_match = re.match(r"^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)", text)
+    if fm_match:
+        fm_block = fm_match.group(1)
+        body = text[fm_match.end():]
+        for line in fm_block.splitlines():
+            m_draft = re.match(r"^\s*draft\s*:\s*(.+?)\s*$", line, re.IGNORECASE)
+            if m_draft and m_draft.group(1).strip().strip("'\"").lower() == "true":
+                is_draft = True
+            m_title = re.match(r"^\s*title\s*:\s*(.+?)\s*$", line)
+            if m_title:
+                val = m_title.group(1).strip()
+                if (val.startswith('"') and val.endswith('"')) or (
+                    val.startswith("'") and val.endswith("'")
+                ):
+                    val = val[1:-1].strip()
+                if val:
+                    fm_title = val
 
-echo "✅ 已更新 ${INDEX_FILE}"
+    if is_draft:
+        return None
+
+    h1_title = None
+    if not fm_title:
+        for line in body.splitlines():
+            m_h1 = re.match(r"^#\s+(.+?)\s*$", line)
+            if m_h1:
+                h1_title = m_h1.group(1).strip()
+                break
+
+    fallback_title = os.path.splitext(os.path.basename(path))[0]
+    return fm_title or h1_title or fallback_title
+
+
+lines = [header, ""]
+
+for sec in sections:
+    sec_dir = os.path.join(content_dir, sec)
+    if not os.path.isdir(sec_dir):
+        continue
+
+    md_files = []
+    for dirpath, _, filenames in os.walk(sec_dir):
+        for fn in filenames:
+            if fn.endswith(".md") and fn != "index.md":
+                md_files.append(os.path.join(dirpath, fn))
+    md_files.sort()
+
+    entries = []
+    for fpath in md_files:
+        title = parse_note(fpath)
+        if title is None:
+            continue
+        rel_path = os.path.relpath(fpath, content_dir).replace(os.sep, "/")
+        target = rel_path[:-3] if rel_path.endswith(".md") else rel_path
+        safe_title = title.replace("|", "\\|")
+        entries.append(f"- [[{target}|{safe_title}]]：{rel_path}")
+
+    if entries:
+        lines.append("")
+        lines.append(f"### {sec.capitalize()}")
+        lines.append("")
+        lines.extend(entries)
+
+with open(index_file, "w", encoding="utf-8") as f:
+    f.write("\n".join(lines) + "\n")
+
+print(f"✅ 已更新 {index_file}")
+PY

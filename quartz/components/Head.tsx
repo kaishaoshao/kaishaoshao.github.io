@@ -322,11 +322,50 @@ const ALAN_CLIENT_SCRIPT = `
     updateScrollEffects();
   }
 
+  function dedupeArticleHeading() {
+    if (!document.body) return;
+    var slug = document.body.getAttribute("data-slug");
+    if (slug === "index") return;
+
+    var titleEl = document.querySelector(".page-header h1.article-title");
+    var article = document.querySelector(".center article");
+    var md = article ? article.querySelector(".markdown-rendered") || article : null;
+    if (!titleEl || !md) return;
+
+    var firstHeading = md.firstElementChild;
+    if (!firstHeading || firstHeading.tagName !== "H1") return;
+
+    var normalizeHeadingText = function (el) {
+      var clone = el.cloneNode(true);
+      clone.querySelectorAll('a[role="anchor"]').forEach(function (a) {
+        a.remove();
+      });
+      return (clone.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    };
+
+    var titleText = normalizeHeadingText(titleEl);
+    var headingText = normalizeHeadingText(firstHeading);
+    if (!titleText || titleText !== headingText) return;
+
+    firstHeading.classList.add("alan-duplicate-h1");
+    var headingId = firstHeading.getAttribute("id");
+    document.querySelectorAll(".toc-content li").forEach(function (li) {
+      var anchor = li.querySelector("a");
+      if (!anchor) return;
+      var dataFor = anchor.getAttribute("data-for");
+      var tocText = (anchor.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if ((headingId && dataFor === headingId) || tocText === headingText) {
+        li.classList.add("alan-duplicate-toc-item");
+      }
+    });
+  }
+
   function initAlan() {
     mountPalettePicker();
     ensureReadingProgress();
     bindGlobalScroll();
     enhanceHomepage();
+    dedupeArticleHeading();
   }
 
   window.__alanRunInit = initAlan;

@@ -272,7 +272,7 @@ article {
     line-height: 1.78;
   }
 
-  /* Comfortable ~70-char prose width; code/tables/cards retain full column width */
+  /* Comfortable ~70-char prose width; code/tables/cards retain readable column width */
   > .markdown-preview-view > p,
   > .markdown-preview-view > ul,
   > .markdown-preview-view > ol,
@@ -289,7 +289,19 @@ article {
   > h2,
   > h3,
   > h4 {
-    max-width: 44rem;
+    max-width: 46rem;
+  }
+
+  h1.alan-duplicate-h1 {
+    display: none;
+  }
+
+  figure[data-rehype-pretty-code-figure],
+  > pre,
+  > .markdown-preview-view > pre,
+  .table-container,
+  .callout {
+    max-width: 54rem;
   }
 
   h1,
@@ -319,6 +331,7 @@ article {
   font-family: var(--uiFont);
   font-size: 0.85rem;
   color: var(--gray);
+  margin: 0.35rem 0 0.55rem;
 }
 
 a {
@@ -480,27 +493,133 @@ blockquote {
   background-color: color-mix(in srgb, var(--alan-surface-card) 48%, transparent);
   border: 1px solid var(--alan-border);
   border-radius: 10px;
-  padding: 0.45rem 0.85rem;
-  margin: 0.65rem 0;
+  padding: 0;
+  margin: 0.45rem 0 0.85rem;
+  width: fit-content;
+  min-width: 12rem;
+  max-width: 46rem;
   font-family: var(--uiFont);
+  font-size: 0.84rem;
+
+  &[open] {
+    width: min(100%, 46rem);
+  }
+
+  /* Hide automatically when frontmatter keys exist (e.g. empty `tags:`) without populated values */
+  &:has(.note-properties-empty):not(
+      :has(
+        .note-properties-tags,
+        .note-properties-text,
+        .note-properties-list,
+        .note-properties-number,
+        .note-properties-boolean,
+        .note-properties-object
+      )
+    ) {
+    display: none;
+  }
+
+  .note-properties-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+
+    .note-properties-separator {
+      display: none;
+    }
+  }
 }
 
 /* ==========================================================================
-   5. Sidebars, Explorer, Search, Graph, TOC & Footer (侧栏与功能组件)
+   5. Single-Left-Sidebar Layout, Reading Canvas, TOC, Explorer & Footer
    ========================================================================== */
 
+.page {
+  max-width: 1360px;
+}
+
 .page > #quartz-body {
+  @media all and ($desktop) {
+    grid-template-columns: 300px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "grid-sidebar-left grid-header"
+      "grid-sidebar-left grid-center"
+      "grid-sidebar-left grid-footer";
+    column-gap: 2.5rem;
+    padding-right: 1.5rem;
+  }
+
+  @media all and ($tablet) {
+    grid-template-columns: 270px minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "grid-sidebar-left grid-header"
+      "grid-sidebar-left grid-center"
+      "grid-sidebar-left grid-footer";
+    column-gap: 1.75rem;
+  }
+
+  @media all and (min-width: 801px) {
+    > .center,
+    > footer {
+      min-width: 0;
+      width: 100%;
+      max-width: 54rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .page-header {
+      margin-top: 3.25rem;
+    }
+  }
+
   .sidebar.left {
-    @media all and ($desktop) {
+    .flex-component > div:empty {
+      display: none;
+    }
+
+    @media all and (min-width: 801px) {
       border-right: 1px solid var(--alan-border);
-      padding-right: 1.5rem;
+      padding: 3.25rem 1.5rem 2rem 1.5rem;
+      gap: 1rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      transition:
+        opacity 0.22s ease,
+        border-color 0.22s ease;
+    }
+
+    @media all and ($tablet) {
+      padding: 3.25rem 1.25rem 2rem 1rem;
     }
   }
 
   .sidebar.right {
-    @media all and ($desktop) {
-      border-left: 1px solid var(--alan-border);
-      padding-left: 1.5rem;
+    display: none !important;
+  }
+
+  /* Keep Explorer compact when an article TOC is also shown in the left sidebar */
+  .sidebar.left:has(.toc) .explorer .explorer-content {
+    max-height: 36vh;
+  }
+
+  .sidebar.left .toc {
+    border-top: 1px dashed var(--alan-border);
+    padding-top: 0.85rem;
+    flex: 1 1 auto;
+    min-height: 6rem;
+  }
+
+  .sidebar.left .graph {
+    border-top: 1px dashed var(--alan-border);
+    padding-top: 0.85rem;
+    margin-top: auto;
+
+    > .graph-outer {
+      height: 220px;
     }
   }
 
@@ -511,6 +630,54 @@ blockquote {
     font-family: var(--uiFont);
     font-size: 0.85rem;
     color: var(--gray);
+  }
+}
+
+/* Distraction-free Reader Mode: gently dim left sidebar chrome & widen reading canvas */
+:root[reader-mode="on"] {
+  @media all and (min-width: 801px) {
+    .page > #quartz-body {
+      .sidebar.left {
+        opacity: 1;
+        border-right-color: transparent;
+
+        > h2.page-title,
+        .search,
+        button.darkmode,
+        .palette-picker-wrapper,
+        .explorer,
+        .toc,
+        .graph {
+          opacity: 0.08;
+          transition: opacity 0.22s ease;
+        }
+
+        button.readermode {
+          opacity: 0.55;
+          transition: opacity 0.22s ease;
+        }
+
+        &:hover {
+          border-right-color: var(--alan-border);
+
+          > h2.page-title,
+          .search,
+          button.darkmode,
+          .palette-picker-wrapper,
+          .explorer,
+          .toc,
+          .graph,
+          button.readermode {
+            opacity: 1;
+          }
+        }
+      }
+
+      > .center,
+      > footer {
+        max-width: 58rem;
+      }
+    }
   }
 }
 
@@ -590,6 +757,10 @@ button.readermode {
     border-left: 1px solid var(--alan-border);
     padding-left: 0.75rem;
 
+    li.alan-duplicate-toc-item {
+      display: none;
+    }
+
     a {
       color: var(--gray);
       font-weight: 400;
@@ -655,6 +826,16 @@ body[data-slug="index"].alan-enhanced {
 
   article .alan-moved-intro {
     display: none;
+  }
+
+  .center {
+    @media all and (min-width: 801px) {
+      padding-top: 1.45rem;
+    }
+
+    > hr:has(+ .page-footer:empty) {
+      display: none;
+    }
   }
 }
 

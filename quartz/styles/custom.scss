@@ -812,6 +812,11 @@ ul.section-ul {
       border-color: var(--secondary);
       box-shadow: var(--alan-card-shadow);
     }
+
+    .meta:empty,
+    .tags:empty {
+      display: none;
+    }
   }
 }
 

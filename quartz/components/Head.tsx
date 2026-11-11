@@ -284,6 +284,11 @@ const ALAN_CLIENT_SCRIPT = `
   function getDirCardMeta(dirLabel, href) {
     var key = (dirLabel || "").replace(/\\/$/, "").toLowerCase();
     var map = {
+      notes: {
+        kicker: "NOTES · KNOWLEDGE BASE",
+        tags: ["Arch · LLM", "LLVM · MLIR", "Opt · RISCV"],
+        svg: '<svg viewBox="0 0 240 120" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="36" y="22" width="50" height="76" rx="8" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.08"/><rect x="95" y="18" width="50" height="80" rx="8" stroke="var(--secondary)" stroke-width="2.2" fill="var(--secondary)" fill-opacity="0.16"/><rect x="154" y="22" width="50" height="76" rx="8" stroke="currentColor" stroke-width="2" fill="currentColor" fill-opacity="0.08"/><path d="M48 42h26M48 56h20M48 70h16M107 40h26M107 54h22M107 68h18M166 42h26M166 56h20M166 70h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+      },
       arch: {
         kicker: "NOTES · ARCHITECTURE",
         tags: ["ISA", "流水线", "Cache"],
@@ -490,108 +495,128 @@ const ALAN_CLIENT_SCRIPT = `
         '<p class="alan-section-subtitle">按专题目录浏览体系结构、编译器、高性能计算、大模型笔记与实用指南</p>';
       dirSection.appendChild(headerWrap);
 
-      var h3s = Array.from(md.querySelectorAll("h3"));
-      h3s.forEach(function (h3) {
-        var next = h3.nextElementSibling;
-        if (!next || next.tagName !== "UL") return;
+      function buildCardFromLi(li) {
+        var anchor = li.querySelector("a");
+        if (!anchor) return null;
+        var href = anchor.getAttribute("href") || "./";
+        var dirTitle = (anchor.textContent || "").trim();
 
-        var secName = (h3.textContent || "").trim();
-        var items = Array.from(next.querySelectorAll("li"));
-        if (items.length === 0) return;
-
-        var groupTitle = document.createElement("div");
-        groupTitle.className = "alan-dir-group-label";
-        groupTitle.textContent = secName;
-        dirSection.appendChild(groupTitle);
-
-        var grid = document.createElement("div");
-        grid.className = items.length >= 3 ? "alan-dir-grid" : "alan-dir-grid alan-dir-grid-compact";
-
-        items.forEach(function (li) {
-          var anchor = li.querySelector("a");
-          if (!anchor) return;
-          var href = anchor.getAttribute("href") || "./";
-          var dirTitle = (anchor.textContent || "").trim();
-
-          var fullExtra = "";
-          Array.from(li.childNodes).forEach(function (node) {
-            if (node.nodeType === 3) {
-              var txt = (node.textContent || "").trim();
-              if (txt) {
-                fullExtra += txt.replace(/^[：:]\\s*/, "");
-              }
+        var fullExtra = "";
+        Array.from(li.childNodes).forEach(function (node) {
+          if (node.nodeType === 3) {
+            var txt = (node.textContent || "").trim();
+            if (txt) {
+              fullExtra += txt.replace(/^[：:]\\s*/, "");
             }
-          });
-
-          var countLabel = "";
-          var descText = fullExtra;
-          var countMatch = fullExtra.match(/（([^（）]+)）\\s*$/);
-          if (countMatch) {
-            countLabel = countMatch[1];
-            descText = fullExtra.slice(0, countMatch.index).trim();
           }
-
-          var meta = getDirCardMeta(dirTitle, href);
-          var card = document.createElement("article");
-          card.className = "alan-dir-card";
-
-          var artDiv = document.createElement("div");
-          artDiv.className = "alan-dir-art";
-          artDiv.setAttribute("aria-hidden", "true");
-          artDiv.innerHTML = meta.svg;
-
-          var bodyDiv = document.createElement("div");
-          bodyDiv.className = "alan-dir-body";
-
-          var kicker = document.createElement("p");
-          kicker.className = "alan-dir-kicker";
-          kicker.textContent = meta.kicker;
-
-          var hTitle = document.createElement("h3");
-          hTitle.className = "alan-dir-title";
-          var titleLink = document.createElement("a");
-          titleLink.href = href;
-          titleLink.textContent = dirTitle;
-          hTitle.appendChild(titleLink);
-
-          var pDesc = document.createElement("p");
-          pDesc.className = "alan-dir-desc";
-          pDesc.textContent = descText || "专题笔记目录";
-
-          var tagList = document.createElement("ul");
-          tagList.className = "alan-dir-tags";
-          if (countLabel) {
-            var countLi = document.createElement("li");
-            countLi.className = "alan-dir-tag-primary";
-            countLi.textContent = countLabel;
-            tagList.appendChild(countLi);
-          }
-          meta.tags.forEach(function (t) {
-            var tLi = document.createElement("li");
-            tLi.textContent = t;
-            tagList.appendChild(tLi);
-          });
-
-          var cta = document.createElement("a");
-          cta.className = "alan-dir-cta";
-          cta.href = href;
-          cta.textContent = "浏览目录 →";
-
-          bodyDiv.appendChild(kicker);
-          bodyDiv.appendChild(hTitle);
-          bodyDiv.appendChild(pDesc);
-          bodyDiv.appendChild(tagList);
-          bodyDiv.appendChild(cta);
-
-          card.appendChild(artDiv);
-          card.appendChild(bodyDiv);
-          grid.appendChild(card);
         });
 
-        dirSection.appendChild(grid);
-        h3.classList.add("alan-moved-intro");
-        next.classList.add("alan-moved-intro");
-      });
+        var countLabel = "";
+        var descText = fullExtra;
+        var countMatch = fullExtra.match(/（([^（）]+)）\\s*$/);
+        if (countMatch) {
+          countLabel = countMatch[1];
+          descText = fullExtra.slice(0, countMatch.index).trim();
+        }
+
+        var meta = getDirCardMeta(dirTitle, href);
+        var card = document.createElement("article");
+        card.className = "alan-dir-card";
+
+        var artDiv = document.createElement("div");
+        artDiv.className = "alan-dir-art";
+        artDiv.setAttribute("aria-hidden", "true");
+        artDiv.innerHTML = meta.svg;
+
+        var bodyDiv = document.createElement("div");
+        bodyDiv.className = "alan-dir-body";
+
+        var kicker = document.createElement("p");
+        kicker.className = "alan-dir-kicker";
+        kicker.textContent = meta.kicker;
+
+        var hTitle = document.createElement("h3");
+        hTitle.className = "alan-dir-title";
+        var titleLink = document.createElement("a");
+        titleLink.href = href;
+        titleLink.textContent = dirTitle;
+        hTitle.appendChild(titleLink);
+
+        var pDesc = document.createElement("p");
+        pDesc.className = "alan-dir-desc";
+        pDesc.textContent = descText || "专题笔记目录";
+
+        var tagList = document.createElement("ul");
+        tagList.className = "alan-dir-tags";
+        if (countLabel) {
+          var countLi = document.createElement("li");
+          countLi.className = "alan-dir-tag-primary";
+          countLi.textContent = countLabel;
+          tagList.appendChild(countLi);
+        }
+        meta.tags.forEach(function (t) {
+          var tLi = document.createElement("li");
+          tLi.textContent = t;
+          tagList.appendChild(tLi);
+        });
+
+        var cta = document.createElement("a");
+        cta.className = "alan-dir-cta";
+        cta.href = href;
+        cta.textContent = "浏览目录 →";
+
+        bodyDiv.appendChild(kicker);
+        bodyDiv.appendChild(hTitle);
+        bodyDiv.appendChild(pDesc);
+        bodyDiv.appendChild(tagList);
+        bodyDiv.appendChild(cta);
+
+        card.appendChild(artDiv);
+        card.appendChild(bodyDiv);
+        return card;
+      }
+
+      var h3s = Array.from(md.querySelectorAll("h3"));
+      if (h3s.length > 0) {
+        h3s.forEach(function (h3) {
+          var next = h3.nextElementSibling;
+          if (!next || next.tagName !== "UL") return;
+
+          var secName = (h3.textContent || "").trim();
+          var items = Array.from(next.querySelectorAll("li"));
+          if (items.length === 0) return;
+
+          var groupTitle = document.createElement("div");
+          groupTitle.className = "alan-dir-group-label";
+          groupTitle.textContent = secName;
+          dirSection.appendChild(groupTitle);
+
+          var grid = document.createElement("div");
+          grid.className = items.length >= 3 ? "alan-dir-grid" : "alan-dir-grid alan-dir-grid-compact";
+          items.forEach(function (li) {
+            var card = buildCardFromLi(li);
+            if (card) grid.appendChild(card);
+          });
+
+          dirSection.appendChild(grid);
+          h3.classList.add("alan-moved-intro");
+          next.classList.add("alan-moved-intro");
+        });
+      } else {
+        var directLists = Array.from(md.querySelectorAll("ul"));
+        directLists.forEach(function (ul) {
+          var items = Array.from(ul.querySelectorAll("li"));
+          if (items.length === 0) return;
+          var grid = document.createElement("div");
+          grid.className = items.length >= 3 ? "alan-dir-grid" : "alan-dir-grid alan-dir-grid-compact";
+          items.forEach(function (li) {
+            var card = buildCardFromLi(li);
+            if (card) grid.appendChild(card);
+          });
+          dirSection.appendChild(grid);
+          ul.classList.add("alan-moved-intro");
+        });
+      }
 
       md.appendChild(dirSection);
     }

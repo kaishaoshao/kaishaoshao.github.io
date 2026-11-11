@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# scripts/update_index.sh – 自动同步 content/index.md 首页归档目录与内容介绍
+# scripts/update_index.sh – 自动同步 content/index.md 首页顶层目录与介绍
 # 用法: ./scripts/update_index.sh
-# 仅展示各板块下的目录及其内容简介，不直接罗列单个文档。
+# 仅展示顶层板块目录（Notes / Tutorials / Skills）及其内容简介，子目录与文章在进入各目录后展示。
 
 set -euo pipefail
 
@@ -28,16 +28,11 @@ title: kaishaoshao的个人空间 🌱
 
 ## 🪴 归档文章"""
 
-# 各目录内容介绍（若目录下存在 index.md 且配置了 description，则优先使用其 frontmatter description）
-DIR_DESCRIPTIONS = {
-    "notes/Arch": "计算机体系结构核心脉络整理，涵盖 ISA、流水线、分支预测、乱序执行、Cache 与虚拟内存等常见名词",
-    "notes/LLM": "大语言模型底层原理与工程实现笔记，包含 Zero to Hero 从零搭建训练体系记录",
-    "notes/LLVM": "LLVM 编译器后端架构与代码生成（Code Generation）方向学习笔记",
-    "notes/MLIR": "MLIR 多级中间表示学习记录，涵盖 TableGen 数据定义语言基础与工具链实践",
-    "notes/Opt": "程序性能优化方法论与实战分析，包含多级性能瓶颈定位及矩阵乘法调优笔记",
-    "notes/RISCV": "RISC-V 体系结构与 RVV 向量指令集扩展（SISD/SIMD）基础概念与编程入门",
-    "tutorials": "博客搭建与写作入门教程，涵盖 Quartz v5 站点配置及 Hexo 迁移使用指南",
-    "skills": "编译器与底层开发工作工具链导航，收录 LLVM、MLIR、GCC 与 RISC-V/ARM 交叉编译资源",
+# 顶层目录内容介绍（若目录下存在 index.md 且配置了 description，则优先使用其 frontmatter description）
+SECTION_DESCRIPTIONS = {
+    "notes": "底层技术与系统学习笔记合集，涵盖计算机体系结构（Arch）、LLVM / MLIR 编译器、程序性能优化（Opt）、RISC-V RVV 与 LLM 大模型方向",
+    "tutorials": "博客搭建与写作入门教程，涵盖 Quartz v5 站点配置、本地预览及从 Hexo 迁移的完整使用指南",
+    "skills": "编译器与底层开发工作工具链导航，收录 LLVM、MLIR、GCC 与 RISC-V / ARM 交叉编译实用资源",
 }
 
 
@@ -90,90 +85,66 @@ def parse_markdown_meta(path: str):
                 break
 
     fallback_title = os.path.splitext(os.path.basename(path))[0]
-    stripped_body = re.sub(r"[#\s`>*_-]+", "", body)
-    is_stub = len(stripped_body) < 40
     return {
         "title": fm_title or h1_title or fallback_title,
         "description": fm_desc,
         "is_draft": is_draft,
-        "is_stub": is_stub,
     }
 
 
-def collect_dir_info(dir_path: str, key: str):
-    index_md = os.path.join(dir_path, "index.md")
+def collect_section_info(sec_path: str, sec_name: str):
+    index_md = os.path.join(sec_path, "index.md")
     custom_desc = None
     if os.path.isfile(index_md):
         custom_desc = parse_markdown_meta(index_md)["description"]
 
+    subdirs = [
+        d
+        for d in sorted(os.listdir(sec_path))
+        if not d.startswith(".") and os.path.isdir(os.path.join(sec_path, d))
+    ]
+
     published_titles = []
-    stub_count = 0
-    for root, _, filenames in os.walk(dir_path):
+    for root, _, filenames in os.walk(sec_path):
         for fn in sorted(filenames):
             if not fn.endswith(".md") or fn == "index.md":
                 continue
             meta = parse_markdown_meta(os.path.join(root, fn))
-            if meta["is_draft"]:
-                continue
-            if meta["is_stub"]:
-                stub_count += 1
-            else:
+            if not meta["is_draft"]:
                 published_titles.append(meta["title"])
 
-    total_published = len(published_titles) + stub_count
-    if total_published == 0:
+    total_files = len(published_titles)
+    if total_files == 0 and not subdirs:
         return None
 
-    desc = custom_desc or DIR_DESCRIPTIONS.get(key)
+    desc = custom_desc or SECTION_DESCRIPTIONS.get(sec_name)
     if not desc:
-        if published_titles:
-            preview = "、".join(published_titles[:3])
-            suffix = " 等内容" if len(published_titles) > 3 else ""
-            desc = f"收录 {preview}{suffix}"
+        if subdirs:
+            desc = f"包含 {'、'.join(subdirs)} 等子目录专题内容"
         else:
-            desc = "专题笔记与资料整理中"
+            desc = f"收录 {'、'.join(published_titles[:3])} 等内容"
 
-    if len(published_titles) == 0 and stub_count > 0:
-        count_note = f"（整理中，{stub_count} 篇占位）"
+    if subdirs:
+        count_note = f"（{len(subdirs)} 个子目录 · 共 {total_files} 篇）"
     else:
-        count_note = f"（共 {total_published} 篇）"
+        count_note = f"（共 {total_files} 篇）"
 
     return f"{desc}{count_note}"
 
 
-lines = [header, ""]
-
+entries = []
 for sec in sections:
     sec_dir = os.path.join(content_dir, sec)
     if not os.path.isdir(sec_dir):
         continue
+    info = collect_section_info(sec_dir, sec)
+    if not info:
+        continue
+    href = f"./{slugify_segment(sec)}/"
+    entries.append(f"- [{sec.capitalize()}/]({href})：{info}")
 
-    subdirs = [
-        d
-        for d in sorted(os.listdir(sec_dir))
-        if not d.startswith(".") and os.path.isdir(os.path.join(sec_dir, d))
-    ]
-
-    entries = []
-    if subdirs:
-        for sub in subdirs:
-            sub_path = os.path.join(sec_dir, sub)
-            info = collect_dir_info(sub_path, f"{sec}/{sub}")
-            if not info:
-                continue
-            href = f"./{slugify_segment(sec)}/{slugify_segment(sub)}/"
-            entries.append(f"- [{sub}/]({href})：{info}")
-    else:
-        info = collect_dir_info(sec_dir, sec)
-        if info:
-            href = f"./{slugify_segment(sec)}/"
-            entries.append(f"- [{sec.capitalize()}/]({href})：{info}")
-
-    if entries:
-        lines.append("")
-        lines.append(f"### {sec.capitalize()}")
-        lines.append("")
-        lines.extend(entries)
+lines = [header, ""]
+lines.extend(entries)
 
 with open(index_file, "w", encoding="utf-8") as f:
     f.write("\n".join(lines) + "\n")

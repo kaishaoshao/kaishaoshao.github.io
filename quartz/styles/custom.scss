@@ -816,28 +816,8 @@ ul.section-ul {
 }
 
 /* ==========================================================================
-   6. Homepage #intro Hero & Punch-Hole Card Deck (首页风格重构)
+   6. Homepage Full-Width Editorial Layout (对标 whereisalan.dev 主页 & #about)
    ========================================================================== */
-
-body[data-slug="index"].alan-enhanced {
-  .page-header {
-    display: none;
-  }
-
-  article .alan-moved-intro {
-    display: none;
-  }
-
-  .center {
-    @media all and (min-width: 801px) {
-      padding-top: 1.45rem;
-    }
-
-    > hr:has(+ .page-footer:empty) {
-      display: none;
-    }
-  }
-}
 
 @keyframes alan-spin-slow {
   from {
@@ -858,140 +838,299 @@ body[data-slug="index"].alan-enhanced {
   }
 }
 
-#alan-intro-hero {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.38fr) minmax(190px, 0.82fr);
-  gap: 1.5rem;
-  align-items: center;
-  margin: 1.8rem 0 2.4rem;
-  padding: 2.2rem 2rem;
-  border-radius: 20px;
-  background:
-    radial-gradient(circle at 85% 22%, var(--alan-hero-glow), transparent 58%),
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--alan-surface-card) 68%, var(--light)),
-      var(--light)
-    );
-  border: 1px solid var(--alan-border);
-  box-shadow: var(--alan-card-shadow);
-  overflow: hidden;
+/* Override Quartz sidebar grid on homepage ONLY: full-bleed single-column landing page */
+body[data-slug="index"] {
+  .page {
+    max-width: none !important;
+    width: 100%;
+    margin: 0;
+  }
 
-  @media all and ($mobile) {
-    grid-template-columns: 1fr;
-    padding: 1.65rem 1.35rem;
-    margin-top: 0.9rem;
+  .page > #quartz-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    grid-template-areas:
+      "grid-header"
+      "grid-center"
+      "grid-footer" !important;
+    column-gap: 0 !important;
+    row-gap: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+
+    /* Keep .search-container reachable while hiding left sidebar chrome on index */
+    .sidebar.left,
+    .sidebar.left:has(.explorer) {
+      position: fixed !important;
+      top: 0;
+      left: 0;
+      width: 0 !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: none !important;
+      background: transparent !important;
+      overflow: visible !important;
+      z-index: 1002;
+
+      > h2.page-title,
+      > .mobile-only,
+      > .explorer {
+        display: none !important;
+      }
+
+      > .flex-component {
+        position: static;
+        width: 0;
+        height: 0;
+        padding: 0;
+        margin: 0;
+        overflow: visible;
+      }
+
+      .search > .search-button,
+      button.darkmode,
+      button.readermode {
+        display: none !important;
+      }
+    }
+
+    > .center {
+      max-width: none !important;
+      min-width: 0 !important;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+
+      > hr {
+        display: none;
+      }
+    }
+
+    > footer {
+      max-width: none !important;
+      min-width: 0 !important;
+      width: 100% !important;
+      margin: 3.5rem 0 0 !important;
+      padding: 2.3rem 1.5rem;
+      border-top: none;
+      background-color: var(--alan-surface-active);
+      color: #ffffff;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.6rem;
+
+      p,
+      li,
+      a {
+        color: #ffffff;
+        margin: 0;
+      }
+
+      ul {
+        display: flex;
+        gap: 1.4rem;
+        list-style: none;
+        padding: 0;
+      }
+
+      a {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        opacity: 0.92;
+
+        &:hover {
+          opacity: 1;
+        }
+      }
+    }
+  }
+
+  .page-header {
+    display: none;
+  }
+
+  article .alan-moved-intro {
+    display: none;
   }
 }
 
-.alan-intro-left {
+:root[saved-theme="dark"] body[data-slug="index"] .page > #quartz-body > footer {
+  background-color: color-mix(in srgb, var(--alan-surface-active) 76%, #171513);
+}
+
+/* Fixed Translucent Top Menu (#menu from whereisalan.dev) */
+#alan-top-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 54px;
+  z-index: 1000;
+  background-color: color-mix(in srgb, var(--light) 72%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid color-mix(in srgb, var(--alan-border) 55%, transparent);
+
+  .alan-menu-inner {
+    max-width: 1200px;
+    height: 100%;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+
+    @media all and (max-width: 520px) {
+      padding: 0 0.75rem;
+      gap: 0.5rem;
+    }
+  }
+
+  .alan-menu-brand {
+    font-family: var(--displayFont);
+    font-size: 1.55rem;
+    font-weight: 400;
+    color: var(--dark);
+    text-decoration: none;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--secondary);
+    }
+
+    @media all and (max-width: 680px) {
+      display: none;
+    }
+  }
+
+  #alan-menu-items {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: clamp(0.75rem, 2.6vw, 2.4rem);
+
+    li {
+      margin: 0;
+      padding: 0;
+    }
+
+    a {
+      font-family: var(--uiFont);
+      font-size: 0.86rem;
+      font-weight: 500;
+      color: var(--darkgray);
+      text-decoration: none;
+      padding: 0.25rem 0;
+      transition: color 0.18s ease;
+      white-space: nowrap;
+
+      @media all and (max-width: 520px) {
+        font-size: 0.78rem;
+      }
+
+      &:hover,
+      &.active {
+        color: var(--secondary);
+      }
+    }
+  }
+
+  .alan-top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  .alan-top-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--darkgray);
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition:
+      background-color 0.18s ease,
+      color 0.18s ease;
+
+    &:hover {
+      background-color: var(--alan-surface-card);
+      color: var(--secondary);
+    }
+  }
+}
+
+/* Section 1: Full-Viewport #intro (no enclosing card box, big Smythe type + spinning star) */
+#alan-intro {
   position: relative;
-  z-index: 2;
+  min-height: calc(100vh - 54px);
+  padding: 5.5rem 2rem 3.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+  .alan-intro-inner {
+    width: 100%;
+    max-width: 1100px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.9fr);
+    align-items: center;
+    gap: 2.5rem;
+
+    @media all and ($mobile) {
+      grid-template-columns: 1fr;
+      text-align: center;
+      gap: 2rem;
+    }
+  }
 }
 
-.alan-intro-salutation {
+#alan-intro-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   font-family: var(--displayFont);
-  font-size: 1.8rem;
-  line-height: 1;
+}
+
+#alan-intro-salutation {
+  font-size: clamp(2rem, 3.8vw, 3rem);
+  line-height: 1.05;
   color: var(--darkgray);
-  letter-spacing: 0.03em;
+  font-weight: 400;
 }
 
-.alan-intro-name {
+#alan-intro-name {
   font-family: var(--displayFont);
-  font-size: clamp(3rem, 5.4vw, 4.3rem);
-  line-height: 0.94;
+  font-size: clamp(4.1rem, 8.6vw, 6.9rem);
+  line-height: 0.9;
   font-weight: 400;
   margin: 0;
   color: var(--secondary);
   letter-spacing: 0.01em;
 }
 
-.alan-intro-tagline {
-  font-family: var(--displayFont);
-  font-size: clamp(1.55rem, 2.6vw, 2.1rem);
-  line-height: 1.1;
-  color: var(--tertiary);
-  margin-bottom: 0.35rem;
-}
-
-.alan-intro-brief {
-  margin: 0.35rem 0 0.5rem;
-  font-family: var(--editorialFont);
-  font-size: 1.03rem;
-  line-height: 1.7;
-  color: var(--darkgray);
-  max-width: 36rem;
-}
-
-.alan-intro-topics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 0.2rem 0 0.75rem;
-}
-
-.alan-topic-chip {
-  font-family: var(--codeFont);
-  font-size: 0.74rem;
-  padding: 0.2rem 0.65rem;
-  border-radius: 999px;
-  background-color: var(--alan-chip);
-  color: var(--darkgray);
-  border: 1px solid var(--alan-border);
-}
-
-.alan-intro-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+#alan-intro-tag-line {
+  font-size: clamp(1.9rem, 3.5vw, 2.85rem);
+  line-height: 1.08;
+  color: var(--secondary);
+  opacity: 0.9;
   margin-top: 0.25rem;
-}
-
-.alan-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.55rem 1.3rem;
-  border-radius: 25px;
-  font-family: var(--uiFont);
-  font-size: 0.88rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    transform 0.18s ease,
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
-
-  &:hover {
-    transform: translateY(-1px);
-  }
-}
-
-.alan-pill-primary {
-  background-color: var(--alan-surface-active);
-  color: #ffffff !important;
-
-  &:hover {
-    background-color: var(--secondary);
-    color: #ffffff !important;
-  }
-}
-
-.alan-pill-secondary {
-  background-color: var(--alan-surface-card);
-  color: var(--dark) !important;
-  border: 1px solid var(--alan-border);
-
-  &:hover {
-    border-color: var(--secondary);
-    color: var(--secondary) !important;
-  }
 }
 
 .alan-intro-visual {
@@ -999,16 +1138,16 @@ body[data-slug="index"].alan-enhanced {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 185px;
+  min-height: 290px;
 
   @media all and ($mobile) {
-    min-height: 145px;
+    min-height: 210px;
   }
 }
 
 #alan-intro-star {
-  width: 175px;
-  height: 175px;
+  width: clamp(220px, 28vw, 390px);
+  height: clamp(220px, 28vw, 390px);
   color: var(--alan-star-color);
   transition: transform 0.12s linear;
   will-change: transform;
@@ -1016,27 +1155,27 @@ body[data-slug="index"].alan-enhanced {
   svg {
     width: 100%;
     height: 100%;
-    animation: alan-spin-slow 46s linear infinite;
+    animation: alan-spin-slow 54s linear infinite;
   }
 }
 
 #alan-intro-emblem {
   position: absolute;
-  bottom: 8px;
+  bottom: 12px;
   animation: alan-bob 4s ease-in-out infinite;
 }
 
 .alan-emblem-card {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.42rem 0.85rem;
+  gap: 0.5rem;
+  padding: 0.45rem 0.95rem;
   border-radius: 999px;
   background-color: var(--alan-surface-card);
   border: 1px solid var(--alan-border);
   box-shadow: var(--alan-card-shadow);
   font-family: var(--codeFont);
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   color: var(--dark);
   white-space: nowrap;
 }
@@ -1049,79 +1188,98 @@ body[data-slug="index"].alan-enhanced {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 25%, transparent);
 }
 
-/* Section heading above punch-hole card deck */
-article h2.alan-section-heading {
-  max-width: none;
-  display: flex;
+#alan-scroll-cue {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  font-family: var(--displayFont);
-  font-size: 2.3rem;
-  line-height: 1.1;
-  font-weight: 400;
+  gap: 0.4rem;
+  font-family: var(--uiFont);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--gray);
+  text-decoration: none;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+
+  &:hover {
+    color: var(--secondary);
+    transform: translate(-50%, 2px);
+  }
+}
+
+/* Shared Section Headings for Homepage */
+.alan-section-title {
+  font-family: var(--displayFont) !important;
+  font-size: clamp(2.5rem, 4.5vw, 3.3rem) !important;
+  line-height: 1.1 !important;
+  font-weight: 400 !important;
+  text-align: center;
   color: var(--dark);
-  border-bottom: none;
-  margin: 0.8rem 0 1.4rem;
-  letter-spacing: 0.03em;
+  margin: 0 0 0.6rem !important;
+  padding: 0 !important;
+  border-bottom: none !important;
+  max-width: none !important;
+}
 
-  &::before,
-  &::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--alan-border);
+.alan-section-subtitle {
+  font-family: var(--uiFont);
+  font-size: 0.96rem;
+  color: var(--gray);
+  text-align: center;
+  max-width: 38rem !important;
+  margin: 0 auto 2.5rem !important;
+}
+
+/* Section 2: #about — Horizontal Punch-Hole Cards (inspired by whereisalan.dev/#about) */
+#alan-about {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 5.5rem 1.5rem 3.5rem;
+
+  .alan-section-title {
+    margin-bottom: 2.5rem !important;
   }
 }
 
-/* Punch-Hole Cards Deck (inspired by whereisalan.dev .card & .bh-card) */
-.alan-card-deck {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.45rem;
-  width: 100%;
-  margin: 0.5rem 0 1.5rem;
-}
-
-.alan-card.alan-card-wide {
-  grid-column: 1 / -1;
-
-  ul.alan-card-list {
-    @media all and (min-width: 680px) {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.35rem 1.5rem;
-
-      li {
-        padding: 0.55rem 0;
-      }
-    }
-  }
-}
-
-.alan-card {
-  position: relative;
+.alan-about-deck {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  width: 100%;
+}
+
+.alan-about-card {
+  position: relative;
+  width: min(94%, 56rem);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2.2rem;
+  padding: 2.1rem 2.4rem 2.1rem 3.4rem;
   background-color: var(--alan-surface-card);
   border: 1px solid var(--alan-border);
   border-radius: 16px;
-  padding: 2.5rem 1.35rem 1.35rem;
   box-shadow: var(--alan-card-shadow);
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+    transform 0.22s ease,
+    border-color 0.22s ease;
 
-  /* Signature top-center punch hole */
+  /* Signature left-center punch hole on horizontal cards */
   &::before {
     content: "";
     position: absolute;
-    top: 12px;
-    left: 50%;
-    width: 1.12rem;
-    height: 1.12rem;
-    margin-left: -0.56rem;
+    left: 1.1rem;
+    top: 50%;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-top: -0.675rem;
     border-radius: 50%;
     background-color: var(--light);
     box-shadow: var(--alan-hole-shadow);
@@ -1129,101 +1287,261 @@ article h2.alan-section-heading {
 
   &:hover {
     transform: translateY(-3px);
-    border-color: color-mix(in srgb, var(--secondary) 45%, var(--alan-border));
+    border-color: color-mix(in srgb, var(--secondary) 40%, var(--alan-border));
+  }
+
+  @media all and ($mobile) {
+    flex-direction: column;
+    text-align: center;
+    padding: 2.8rem 1.4rem 1.75rem;
+    gap: 1.2rem;
+
+    &::before {
+      left: 50%;
+      top: 0.95rem;
+      margin-top: 0;
+      margin-left: -0.675rem;
+    }
   }
 }
 
-.alan-card-kicker {
-  font-family: var(--uiFont);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  text-align: center;
-  color: var(--tertiary);
-  margin-bottom: 0.25rem;
+.alan-about-art {
+  width: 150px;
+  height: 132px;
+  flex-shrink: 0;
+  color: var(--dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: color-mix(in srgb, var(--light) 55%, transparent);
+  border: 1px solid var(--alan-border);
+  border-radius: 12px;
+  padding: 0.5rem;
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
 }
 
-.alan-card h3.alan-card-title {
+.alan-about-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.alan-about-title {
   font-family: var(--displayFont);
-  font-size: 2.05rem;
+  font-size: 2rem;
   line-height: 1.1;
   font-weight: 400;
-  text-align: center;
   color: var(--dark);
-  margin: 0 0 0.85rem;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px dashed var(--alan-border);
-  max-width: none;
-
-  > a[role="anchor"] {
-    display: none;
-  }
+  margin: 0 0 0.65rem;
 }
 
-.alan-card ul.alan-card-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 1rem;
-  max-width: none;
-  flex: 1;
-
-  li {
-    display: flex;
-    flex-direction: column;
-    gap: 0.18rem;
-    padding: 0.48rem 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--alan-border) 55%, transparent);
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    a {
-      font-family: var(--editorialFont);
-      font-size: 0.98rem;
-      font-weight: 600;
-      background-color: transparent;
-      padding: 0;
-      color: var(--dark);
-      line-height: 1.38;
-
-      &[href$="/"]::before {
-        content: "📁 ";
-        font-size: 0.86em;
-      }
-
-      &:hover {
-        color: var(--secondary);
-      }
-    }
-  }
-}
-
-.alan-item-path {
-  font-family: var(--uiFont);
-  font-size: 0.82rem;
-  line-height: 1.5;
+.alan-about-text {
+  font-family: var(--editorialFont);
+  font-size: 1.02rem;
+  line-height: 1.75;
   color: var(--darkgray);
-  opacity: 0.86;
-  word-break: normal;
+  margin: 0 !important;
+  max-width: none !important;
 }
 
-.alan-card-footer {
-  margin-top: auto;
-  padding-top: 0.5rem;
-  display: flex;
-  justify-content: center;
+.alan-about-action {
+  margin-top: 1.1rem;
 }
 
-.alan-card-cta {
+.alan-flat-btn {
   display: inline-block;
-  padding: 0.42rem 1.05rem;
+  padding: 0.55rem 1.35rem;
   border-radius: 25px;
   background-color: var(--alan-surface-active);
   color: #ffffff !important;
   font-family: var(--uiFont);
-  font-size: 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color 0.25s ease,
+    transform 0.18s ease;
+
+  &:hover {
+    background-color: var(--secondary);
+    color: #ffffff !important;
+    transform: translateY(-1px);
+  }
+}
+
+/* Section 3: #directories — Topic Directory Cards Grid (inspired by whereisalan.dev/blog/) */
+#alan-directories {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 4.5rem 1.5rem 2.5rem;
+}
+
+.alan-dir-group-label {
+  font-family: var(--uiFont);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tertiary);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 2.2rem 0 1.1rem;
+
+  &::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--alan-border);
+  }
+}
+
+.alan-dir-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+
+  @media all and (max-width: 980px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media all and (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.alan-dir-grid-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @media all and (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.alan-dir-card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--alan-surface-card);
+  border: 1px solid var(--alan-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--alan-card-shadow);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--secondary) 48%, var(--alan-border));
+  }
+}
+
+.alan-dir-art {
+  height: 126px;
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 80% 25%, var(--alan-hero-glow), transparent 65%),
+    color-mix(in srgb, var(--light) 55%, var(--alan-surface-card));
+  border-bottom: 1px solid var(--alan-border);
+  color: var(--dark);
+
+  svg {
+    width: 100%;
+    height: 100%;
+    max-width: 220px;
+  }
+}
+
+.alan-dir-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 1.25rem 1.35rem 1.4rem;
+}
+
+.alan-dir-kicker {
+  font-family: var(--uiFont);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tertiary);
+  margin: 0 0 0.35rem !important;
+}
+
+h3.alan-dir-title {
+  font-family: var(--displayFont);
+  font-size: 1.9rem;
+  line-height: 1.1;
+  font-weight: 400;
+  margin: 0 0 0.55rem !important;
+  max-width: none !important;
+
+  a {
+    color: var(--dark);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--secondary);
+    }
+  }
+}
+
+p.alan-dir-desc {
+  font-family: var(--editorialFont);
+  font-size: 0.94rem;
+  line-height: 1.62;
+  color: var(--darkgray);
+  margin: 0 0 1rem !important;
+  max-width: none !important;
+  flex: 1;
+}
+
+ul.alan-dir-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  padding: 0 !important;
+  margin: 0 0 1.1rem !important;
+  max-width: none !important;
+
+  li {
+    font-family: var(--codeFont);
+    font-size: 0.72rem;
+    line-height: 1.3;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background-color: var(--alan-chip);
+    border: 1px solid var(--alan-border);
+    color: var(--darkgray);
+
+    &.alan-dir-tag-primary {
+      background-color: var(--highlight);
+      border-color: color-mix(in srgb, var(--secondary) 35%, transparent);
+      color: var(--secondary);
+      font-weight: 600;
+    }
+  }
+}
+
+a.alan-dir-cta {
+  align-self: flex-start;
+  display: inline-block;
+  padding: 0.48rem 1.15rem;
+  border-radius: 25px;
+  background-color: var(--alan-surface-active);
+  color: #ffffff !important;
+  font-family: var(--uiFont);
+  font-size: 0.82rem;
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -1234,6 +1552,26 @@ article h2.alan-section-heading {
     background-color: var(--secondary);
     color: #ffffff !important;
     transform: translateY(-1px);
+  }
+}
+
+/* Section 4: #alan-graph (Homepage Knowledge Graph) */
+body[data-slug="index"] .page-footer#alan-graph {
+  max-width: 1080px;
+  margin: 2.5rem auto 0;
+  padding: 3.5rem 1.5rem 1rem;
+
+  .alan-graph-heading {
+    margin-bottom: 1.6rem !important;
+  }
+
+  .graph > h3 {
+    display: none;
+  }
+
+  .graph > .graph-outer {
+    height: 360px;
+    border-radius: 18px;
   }
 }
 

@@ -134,9 +134,9 @@ plugins:
   - source: github:quartz-community/graph
     enabled: true
     layout:
-      position: left
-      priority: 60
-      display: desktop-only
+      position: afterBody
+      priority: 20
+      display: all
       condition: is-index
   - source: github:quartz-community/search
     enabled: true

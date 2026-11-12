@@ -1,6 +1,9 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"><url>
     <loc>https://kaishaoshao.github.io/</loc>
-    <lastmod>2026-10-15T06:24:04.000Z</lastmod>
+    <lastmod>2026-11-12T01:54:39.000Z</lastmod>
+  </url><url>
+    <loc>https://kaishaoshao.github.io/notes/arch/%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84%E5%B8%B8%E8%A7%81%E5%90%8D%E8%AF%8D</loc>
+    <lastmod>2026-11-12T01:54:39.000Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/llm/zero-to-hero</loc>
     <lastmod>2026-03-20T10:39:18.000Z</lastmod>
@@ -38,57 +41,60 @@
     <loc>https://kaishaoshao.github.io/tutorials/hello-world</loc>
     <lastmod>2026-05-26T00:00:00.000Z</lastmod>
   </url><url>
-    <loc>https://kaishaoshao.github.io/notes/llm/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <loc>https://kaishaoshao.github.io/notes/arch/</loc>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
+  </url><url>
+    <loc>https://kaishaoshao.github.io/notes/llm/</loc>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/llvm/llvm_code_generation/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/llvm/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/mlir/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/opt/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/notes/riscv/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/skills/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tutorials/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/llm</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/0.0.1</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/compiler</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/llvm</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/gcc</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/mlir</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/tools</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url><url>
     <loc>https://kaishaoshao.github.io/tags/</loc>
-    <lastmod>2026-11-11T10:01:17.488Z</lastmod>
+    <lastmod>2026-11-12T02:24:49.150Z</lastmod>
   </url></urlset>

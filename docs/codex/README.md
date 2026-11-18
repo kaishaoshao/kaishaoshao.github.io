@@ -9,7 +9,7 @@
 
 Triton Coral 计划按语法和执行语义逐步推进，每个阶段配套教程、测试源码及验收。先实现真实标量端到端，再增加 block/mask、JIT、二维/循环与 Ascend TTS/Linalg、归约/RVV、多维 grid/多核、分层存储及 dot/Zvt。教程维护在原 [plan.md](triton-coral/plan.md#语法驱动开发与逐阶段教程)，测试入口为 [run_stage.py](triton-coral/examples/run_stage.py)；前端检查、主机侧自检与实际设备执行分别记录。
 
-LLVM HIP/Vortex 采用 RISCV Target 内的 `-mcpu=vortex` CPU/subtarget，覆盖 11 个阶段、66 个任务。入口见 [主题目录](llvm-hip-vortex/README.md)，架构见 [architecture.md](llvm-hip-vortex/architecture.md)。
+LLVM HIP/Vortex 按 10 课从 HIP 语法/AST、语义与设备 IR 推进到 SimX 和完整启动；技术结构继续采用 RISCV Target 内的 `-mcpu=vortex`。保留 11 组、66 项工程验收账本。入口见 [主题目录](llvm-hip-vortex/README.md)，第一课见 [getting-started.md](llvm-hip-vortex/getting-started.md)。
 
 ## 更新方式
 

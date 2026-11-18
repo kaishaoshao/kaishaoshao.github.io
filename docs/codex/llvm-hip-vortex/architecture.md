@@ -79,6 +79,8 @@ CPU 的默认 feature 列表与 DefaultMarch 必须一致。初期选用可通�
 
 ## 4. 分阶段实施
 
+下表是工程能力与完整出口，授课顺序见 [plan.md 的十课主线](plan.md#tutorial-route)。教学从现有 HIP 语法/AST/Sema/IR 的隔离实验开始，按程序需要引入表中的连接点；mcpu=vortex 仍是目标配置，但不作为理解第一段 HIP 源码之前的实现前置。
+
 | 阶段 | 核心问题 | 退出条件 |
 |---|---|---|
 | T00 | 环境和 ABI 基线是否清楚 | 新 LLVM 基础构建、参考执行与 ABI 分析 |
@@ -93,7 +95,7 @@ CPU 的默认 feature 列表与 DefaultMarch 必须一致。初期选用可通�
 | T09 | 是否支持 block 协作 | shared memory、barrier、reduction、SGEMM |
 | T10 | 是否可扩展和复现 | 匹配配置的原子、stream/event 与交付验证 |
 
-每阶段 6 项，共 66 个主线任务。详细练习与验收见 [任务卡](tasks.md)。旧稿已包含“复用 RISC-V、增加 Vortex 语义与 HIP”的主线；本修订补上明确的 CPU/subtarget 设计及单独验收阶段。
+每个工程分组保留 6 项，共 66 项。详细验收见 [任务账本](tasks.md)，已有 ID/状态不因授课重排而改变。课程可先实现局部连接，只有相关执行依赖补齐后才能声称某个完整出口通过。
 
 ## 5. 最终产物与用户体验
 

@@ -6,16 +6,16 @@
 
 基于 LLVM 23.1.4，复用 RISCV Target，增加初版 RV64 的 `-mcpu=vortex` CPU/subtarget 和 `xvortex` 指令扩展；实现 Vortex SIMT、kernel ABI、Clang HIP 编译接入，以及对接 Vortex SDK 的独立原生 HIP runtime。以 SimX 为执行验收端。
 
-这是供你实现的教程与计划。官方现有 chipStar/SPIR-V/PoCL HIP 路径作为对照，新 LLVM 的原生 HIP 子集需要按任务逐步实现，不能把参考路径的通过记录算成新后端通过。
+这是供你实现的教程与计划。学习从一个最小 HIP 程序的语法、AST 和 IR 开始，硬件/后端能力按需要引入。官方现有 chipStar/SPIR-V/PoCL HIP 路径作为对照，不能把参考路径的通过记录算成新后端通过。
 
 ## 固定文档目录
 
 | 文件 | 内容 |
 |---|---|
 | [architecture.md](architecture.md) | 架构、CPU/ISA/ABI 职责、选项组合、指令集、实现边界与冻结点 |
-| [plan.md](plan.md) | 官方源码分析、11 阶段路线、里程碑、最终程序和支持边界 |
-| [tasks.md](tasks.md) | 66 个详细任务：阅读、练习、验收、交付与排查 |
-| [getting-started.md](getting-started.md) | T00 基线任务的具体命令和 ABI 阅读练习 |
+| [plan.md](plan.md) | 从语法到执行的十课主线、源码分析、工程分组与最终成果 |
+| [tasks.md](tasks.md) | 保留的 66 项工程验收任务及课程映射，不作为入门阅读顺序 |
+| [getting-started.md](getting-started.md) | 第 1 课的可执行命令；附录保留 T00 构建/ABI 基线 |
 | [build.md](build.md) | 现有 LLVM 分支和 build.sh 的使用说明 |
 | [compiler-sim-contract.md](compiler-sim-contract.md) | 编译产物、两个启动 PC、native/HIP 参数布局与 SimX 的接口 |
 | [evidence-template.md](evidence-template.md) | 任务记录与验证证据模板 |
@@ -23,13 +23,15 @@
 
 ## 学习顺序与最终成果
 
-`T00 基线 → T01 CPU/subtarget → T02 特殊指令 → T03 IR/线程语义 → T04 native kernel → T05 SIMT → T06 runtime → T07 HIP device → T08 HIP 全链路 → T09 shared/barrier → T10 原子/stream/event/交付`
+`L01 语法/AST → L02 语义/启动表达式 → L03 设备 IR → L04 最小编译器改动 → L05 单线程 SimX → L06 多线程/builtins → L07 分歧控制流 → L08 HIP 全链路 → L09 block 协作 → L10 扩展与交付`
 
-先阅读架构和计划，再按 tasks.md 一次推进一个小任务。完成 T08 后的目标是由新 LLVM 编译带 `__global__`、`hipMalloc`、`hipMemcpy` 和 `<<<>>>` 的 vecadd/SAXPY，通过原生 runtime 在 SimX 正确执行；后续增加 reduction、tiled SGEMM，以及匹配配置下的 histogram 和 stream/event 依赖示例。
+先做 [第 1 课](getting-started.md#lesson-1)，再按 [十课课程](plan.md#tutorial-route) 一次推进一个程序变化。每课包含问题、最小输入、机制、命令、自己完成的小改动和验收；原有 T00～T10/66 项作为工程账本保留状态。
+
+L08 的目标是由新 LLVM 编译带 `__global__`、`hipMalloc`、`hipMemcpy` 和 `<<<>>>` 的 vecadd/SAXPY，通过原生 runtime 在 SimX 正确执行；后续增加 reduction、tiled SGEMM，以及匹配配置下的 histogram 和 stream/event 依赖示例。
 
 认识设备指令时先读 [Vortex 指令集与 SIMT 执行模型](architecture.md#vortex-isa)：标准扩展、warp 控制、CSR、32 位编码与参考 llvm-mc 验证均在同一节持续维护。
 
-开始编码前核对 [实现边界与契约](architecture.md#implementation-contracts) 及 [审阅/验收矩阵](plan.md#implementation-review)：重点是两个 PC、O0 必需转换、HIP 包装头/设备库、参数打包、错误处理和资源生命周期。
+学到对应层次时查阅 [实现边界与契约](architecture.md#implementation-contracts) 及 [审阅/验收矩阵](plan.md#implementation-review)：两个 PC、SIMT、包装头/设备库、参数、错误和生命周期分别展开；第一课不要求先消化整个工程清单。
 
 完整 HIP 兼容、RV32、跨文件 device linking、真实硬件部署和大型应用移植属于后续专题。计划中的“能够支持”与已记录的“实际通过”分别维护。
 

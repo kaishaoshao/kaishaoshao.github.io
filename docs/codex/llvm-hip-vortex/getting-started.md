@@ -1,6 +1,99 @@
-# TASK-000：构建 LLVM 23，并解释一个 Vortex kernel 如何执行
+# 第 1 课：Clang 怎样理解 HIP 语法
 
-状态：待你执行。目标是形成可复现的起点，为首个编译器阶段 T01（CPU/subtarget）做准备；本任务不修改后端实现。
+更新日期：2026-11-18（Asia/Shanghai）。先从本课开始，课程目录见 [十课教学主线](plan.md#tutorial-route)。原有 T00 工程基线保留在本文件附录，不再是第一课的全部前置条件。
+
+<a id="lesson-1"></a>
+
+## 本课的问题和目标
+
+本课只回答：`__global__`、`__device__` 写进文件后，Clang 怎样识别它们？你会创建一个最小 HIP 文件，依次查看预处理和 AST。暂不链接、不运行 GPU，也不修改 LLVM 源码。
+
+HIP 这些限定符通常通过头文件宏展开为 Clang 属性。这里手工写出同样的属性宏，是为观察机制；不能把限定符定义为空，也不能用普通 C++ 模式忽略属性来冒充 HIP 支持。后续会使用真正的 Vortex HIP 支持头。
+
+## 准备观察用的编译器
+
+在 WSL Ubuntu-22.04 的 Bash 中执行：
+
+```bash
+bash
+cd /home/kaikai/vortex-word
+export HIP_TUTORIAL_CLANG=/home/kaikai/vortex-word/tools/llvm-vortex/bin/clang++
+"$HIP_TUTORIAL_CLANG" --version
+mkdir -p artifacts/tutorial/l01
+```
+
+这个路径是已安装的参考 Clang 20.1.8。第一至三课可先用它观察已有语法能力；你自己的 LLVM 23 构建完成后，修改 HIP_TUTORIAL_CLANG 指向新工具并重做实验。每次记录实际版本，不把参考工具结果写成新 LLVM 已通过。
+
+## 写出最小程序
+
+```bash
+cat > artifacts/tutorial/l01/attributes.hip <<'EOF'
+#define __global__ __attribute__((global))
+#define __device__ __attribute__((device))
+#define __host__ __attribute__((host))
+
+__device__ int twice(int v) {
+  return v * 2;
+}
+
+__global__ void store42(int* out) {
+  *out = 42;
+}
+EOF
+```
+
+twice 是 device helper，store42 是逻辑 kernel。本课不调用它们，不需要 threadIdx、hipMalloc 或设备 runtime。
+
+## 第一步：先看宏展开
+
+```bash
+"$HIP_TUTORIAL_CLANG" -x hip --offload-host-only -nogpuinc -nogpulib \
+  -E -P artifacts/tutorial/l01/attributes.hip \
+  > artifacts/tutorial/l01/attributes.ii
+
+cat artifacts/tutorial/l01/attributes.ii
+```
+
+应看到 __global__/__device__ 变成相应 `__attribute__`。`-x hip` 选择语言，host-only 只做本次观察所需的 host 编译路径；nogpuinc/nogpulib 避免本实验依赖默认 GPU 支持头和库。这个无 include 的小例子不要求先安装完整 ROCm。
+
+自己回答：宏展开之后谁负责识别属性？为什么把 __global__ 定义为空会丢失语义？
+
+## 第二步：再看 AST
+
+```bash
+"$HIP_TUTORIAL_CLANG" -x hip --offload-host-only -nogpuinc -nogpulib \
+  -fsyntax-only -Xclang -ast-dump \
+  artifacts/tutorial/l01/attributes.hip \
+  > artifacts/tutorial/l01/attributes.ast.txt
+
+rg 'FunctionDecl|CUDADeviceAttr|CUDAGlobalAttr' \
+  artifacts/tutorial/l01/attributes.ast.txt
+```
+
+观察重点：twice 对应 CUDADeviceAttr，store42 对应 CUDAGlobalAttr。AST 地址和位置会变化，不比较固定十六进制地址。Clang 的 CUDA/HIP 共享了部分实现和节点命名，CUDA 前缀不代表此程序选择了 NVIDIA 后端。
+
+本命令只做预处理/解析/语义分析和 AST 输出，没有生成可运行设备镜像。host-only 的成功也不意味着设备侧所有语义已经检查完。
+
+## 自己完成的小练习
+
+1. 新增一个显式 __host__ 函数，查看对应属性。
+2. 新增一个未标记的普通函数，解释它默认在哪一侧使用。默认 host 语义不一定表现为一个显式 CUDAHostAttr 节点。
+3. 用自己的话写出“宏 → 属性 → AST”三个层次，指出哪部分是 Clang 已有能力。
+4. 说明本课为什么没有证明 Vortex kernel 能在 SimX 运行。
+
+本课交付：最小输入、预处理结果、AST 摘要和上述回答。使用 [证据模板](evidence-template.md) 记录课程号 L01 和实际工具版本；关联任务只记录本课覆盖的部分，不自动把整个 T07 标为完成。
+
+## 本课完成后
+
+进入 plan.md 中的 L02：先观察非法 host/device 调用，再看 <<<>>> 的 CUDAKernelCallExpr；L03 才观察设备 IR。到 L04 首次修改编译器之前，再完成必要的 LLVM 23 构建与基线核对。
+
+2026-11-18 已在参考 Clang 20.1.8 上核对本课的预处理与属性 AST，命令成功；也做了后续课的两个非法调用、launch AST 和设备 IR 隔离实验。记录详见 [课程证据边界](plan.md#03-已核对的教学实验与证据边界)。本课不包含新 LLVM 23 或新 SimX 执行通过记录。
+
+<a id="engineering-baseline"></a>
+
+## 附录：保留的 T00 工程基线任务
+
+原有状态和证据按实际进度保留。这个附录用于工程环境和 ABI 基线验收，本身不修改后端；按课程需要在首次源码修改/执行验收前完成相关项，不要求第一课先读完它。
 
 这是 T00 阶段的操作任务书，对应 [详细任务卡](tasks.md) 中 T00.1～T00.6。记录时使用 [证据模板](evidence-template.md)，总览末尾说明 [最终可以做成什么](plan.md#6-最后可以做成什么样子)。
 
@@ -13,13 +106,13 @@
 | T00.5 | 第 6 节：官方代码与 ABI | 参数布局、调用链与源码分析 |
 | T00.6 | 第 7～8 节及总结 | 分层验收计划、七个问题的回答 |
 
-## 1. 为什么先做这一步
+### 1. 为什么先做这一步
 
 目前参考 Clang 20.1.8 + SDK + SimX 已有通过记录；你自己的 LLVM 23.1.4 只完成了 CMake 配置，尚未生成编译器。先区分“标准 RISC-V 编译器正常”“参考 Vortex 系统正常”“新编译器已支持 Vortex”三个结论，后续才能定位错误。
 
 本任务结束时，你应能回答：SimX 执行哪个文件、kernel 地址从哪里来、参数指针如何到达 a0，以及为什么普通 RISC-V 后端还不能直接运行 HIP。
 
-## 2. 固定工作目录与记录
+### 2. 固定工作目录与记录
 
 在 WSL Ubuntu-22.04 的 Bash 中运行以下命令；这是操作说明，本次教程设计没有代你执行完整构建。
 
@@ -39,7 +132,7 @@ tools/llvm-vortex/bin/clang --version
 
 新建 `/home/kaikai/vortex-word/artifacts/tutorial/t00/evidence.md`，记录版本、命令和结果，错误也保留原始诊断。
 
-## 3. 编译 LLVM，并验证四个后端
+### 3. 编译 LLVM，并验证四个后端
 
 ```bash
 cd /home/kaikai/vortex-word/llvm-project
@@ -59,7 +152,7 @@ cmake --build ../build/llvm --parallel 4 \
 
 这些工具来自 `build/llvm/bin`。不要把 `tools/llvm-vortex/bin` 的输出误记成 LLVM 23 构建结果。
 
-## 4. 用新 Clang 编译最小标准 RV64 函数
+### 4. 用新 Clang 编译最小标准 RV64 函数
 
 ```bash
 cd /home/kaikai/vortex-word
@@ -80,7 +173,7 @@ build/llvm/bin/clang --target=riscv64-unknown-elf \
 
 验收：生成 RISC-V 汇编及 IR，能解释参数/返回值和 IR 的 target triple/DataLayout。这里没有链接 libc、没有启动代码，也没有 Vortex 指令；它仅验证标准 RISC-V 编译路径。不要把这个 `.s` 或 `.o` 直接交给 SimX 当完整 kernel。
 
-## 5. 复跑参考工具链的执行基线
+### 5. 复跑参考工具链的执行基线
 
 ```bash
 cd /home/kaikai/vortex-word
@@ -92,7 +185,7 @@ bash scripts/run-smoke.sh 2>&1 | tee artifacts/tutorial/t00/reference-smoke.log
 
 如果参考基线失败，先修复配置或依赖，再开始后端任务；不要把失败写成“新 pass 有问题”。SimX 是 CPU 上的功能模拟器，运行速度或输出中的周期数不能据此作真实硬件性能结论。
 
-## 6. 按顺序阅读官方代码，写出 ABI 链路
+### 6. 按顺序阅读官方代码，写出 ABI 链路
 
 所有路径位于 `/home/kaikai/vortex-word/vortex` 下：
 
@@ -120,7 +213,7 @@ bash scripts/run-smoke.sh 2>&1 | tee artifacts/tutorial/t00/reference-smoke.log
 
 参考布局供核对：`num_tasks@0`、`task_size@4`、`dim_x@8`、`src0_addr@16`、`src1_addr@24`、`dst_addr@32`，总计 40 字节。需要解释原因，不能只抄这个数字。
 
-## 7. 一个可选的诊断练习
+### 7. 一个可选的诊断练习
 
 阅读 `/home/kaikai/vortex-word/scripts/validate-compiler.sh` 后，可以尝试：
 
@@ -133,7 +226,7 @@ bash scripts/validate-compiler.sh /home/kaikai/vortex-word/build/llvm
 
 这个命令不是 T00 的通过条件；它是后续 T04/T05 的接入检查之一。当前脚本不是完整 HIP conformance 测试。
 
-## 8. 完成条件与下一任务
+### 8. 完成条件与下一任务
 
 - [ ] LLVM 23 完整构建成功，版本和四个 target 有记录。
 - [ ] add.c 的 RV64 汇编与 IR 来自新编译器。
@@ -141,4 +234,4 @@ bash scripts/validate-compiler.sh /home/kaikai/vortex-word/build/llvm
 - [ ] evidence.md 包含版本、ABI 链路、参数布局和七个问题的回答。
 - [ ] 能清楚说明“本任务还没有为 LLVM 23 添加 Vortex/HIP 实现”。
 
-完成后进入 T01.1：先阅读 [架构方案](architecture.md)，写清 CPU、ISA、ABI 和设备编译边界，再逐步实现 -mcpu=vortex。具体范围见 [66 个任务卡](tasks.md) 中 T01.1～T01.6。CPU 选择阶段通过后再进入 T02 的四条指令，不把 CPU、指令、SIMT 和 HIP 一次搬成大补丁。
+附录完成后按 [课程主线](plan.md#tutorial-route) 继续。CPU、指令和 ABI 仍要实现，但按 L04～L07 的程序演进逐步引入；T01～T10 是工程验收分组，不要求为了开始学习语法就先完成整个 CPU 或指令阶段。

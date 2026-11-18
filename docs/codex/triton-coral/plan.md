@@ -15,7 +15,7 @@
 每个开发增量按下面六步完成：
 
 1. **读源程序**：在 [kernels.py](examples/kernels.py) 中找到本阶段 kernel，说明参数、数据类型、索引、mask 和预期输出。一次先处理一个操作或一种组合。
-2. **读测试**：在 [suite.py](examples/suite.py) 中查看同名阶段的输入、独立参考、边界和负例。58 个用例按阶段逐步启用，不要求先实现全部能力。
+2. **读测试**：在 [suite.py](examples/suite.py) 中查看同名阶段的输入、独立参考、边界和负例。112 个用例按阶段逐步启用，不要求先实现全部能力。
 3. **生成真实 TTIR**：运行 [dump_ttir.py](examples/dump_ttir.py)，找出当前尚未支持的操作、类型或循环状态，记录准备如何保持其语义。
 4. **补齐表示和 lowering**：普通算术和控制流使用标准方言；二维结构化访存需要时接入 TTS/Linalg；调度、存储和 tile 分别在 S6/S7/S8 引入自定义语义。每次转换都配 verifier 和对应 IR 检查。
 5. **接通真实执行**：实现当前阶段所需的编译/运行适配器，生成真实 ELF，装载到 Coral，使用独立参考检查结果、边界和执行轨迹。
@@ -25,7 +25,7 @@
 
 方言随语法需求逐步接入。S1 从标准 LLVM/Arith/CF 起步；S4 用新增二维与循环语法驱动 TTS/Linalg；S5 为归约增加 Vector/RVV lowering；S6/S7/S8 再分别落实 `coral_rt`、`coral_mem` 和计算 tile 方言。每个阶段的源码、修改任务、测试命令和出口见下文。
 
-本计划区分三种进展：**测试定义已提供、前端/主机侧检查通过、Coral 实际执行通过**。当前 14 个 kernel 和 58 个测试定义已提供，前端及测试框架已有核查结果；真实 ELF/设备执行、故障注入及性能仍按阶段实现和验收。有限浮点样例也不代表完整浮点语义已支持。
+本计划区分三种进展：**测试定义已提供、前端/主机侧检查通过、Coral 实际执行通过**。当前 16 个 kernel 和 112 个测试定义已提供，前端及测试框架已有核查结果；真实 ELF/设备执行、故障注入及性能仍按阶段实现和验收。有限浮点样例也不代表完整浮点语义已支持。
 
 ## 已确定的实施顺序
 
@@ -38,7 +38,7 @@
 | S0 | 最小语法与测试入口 | S0-01～S0-03 | G0 | 工具链和参数约定清楚；标量源码可生成并验证 TTIR，未知目标有诊断。 |
 | S1 | 标量语法与 AOT 执行 | S1-01～S1-06 | G1 | 标量 load/store、INT32 算术与 constexpr 由真实源码生成 ELF，在 core0 执行正确。 |
 | S2 | block、mask 与选择 | S2-01～S2-04 | G2 | arange、广播、比较、where、constexpr 分支、masked 访存和顺序 grid 正确。 |
-| S3 | JIT 与特化调用 | S3-01～S3-04 | G3 | `kernel[grid](...)`、运行参数、constexpr 缓存和重复调用获得真实结果。 |
+| S3 | JIT 与特化调用 | S3-01～S3-04 | G3 | 标准 JIT/缓存和设备 buffer 正确；v3 六运行参数 AOT/JIT 通过，v2 超容量明确拒绝。 |
 | S4 | 二维访存与循环 / TTS-Linalg | S4-01～S4-06 | G4 | 二维 stride、广播、运行时 for/while/if 与既有语法在结构化主线执行正确。 |
 | S5 | 归约语法与 RVV | S5-01～S5-03 | G5 | tl.sum/tl.max 及已有 block 语义生成实际执行的 RVV 指令并算对。 |
 | S6 | 多维 grid 与多核 | S6-01～S6-04 | G6 | program_id/num_programs 的二维语义在当前 1/2/4 核子集上无遗漏重复。 |
@@ -56,25 +56,30 @@
 
 | 文件 | 内容 | 能证明什么 |
 | --- | --- | --- |
-| [kernels.py](examples/kernels.py) | 14 个逐步增加语法的真实 Triton kernel | 可供前端检查和后端实现使用的源程序 |
+| [kernels.py](examples/kernels.py) | 16 个逐步增加语法的真实 Triton kernel | 可供前端检查和后端实现使用的源程序 |
 | [suite.py](examples/suite.py) | 每阶段输入、constexpr、grid、独立参考与故障请求 | 确定的语义、边界和测试清单，不导入 Triton |
 | [dump_ttir.py](examples/dump_ttir.py) | 使用固定版本 ASTSource 生成并验证 TTIR | 仅前端可达性，不生成 ELF、不执行 Coral |
 | [ir_checks.txt](examples/ir_checks.txt) | 匹配对应样例/checkpoint 的 FileCheck 前缀 | IR 结构检查，不能代替 verifier 或执行 |
 | [run_stage.py](examples/run_stage.py) | 请求生成、真实适配器调用、证据/数值/轨迹校验 | 拒绝占位 ELF、缺失证据、错误输出及不合法调度 |
 | [test_suite.py](examples/test_suite.py) | 参考边界、陈旧响应、ELF、mask 越界和互斥等主机侧自检 | 测试框架自检，不计作芯片或编译器已支持 |
+| [abi.py](examples/abi.py) | v2/v3参考codec及严格容量检查 | 仅参考编码，固件支持仍待S3-02 |
+| [access.py](examples/access.py) | 逐program逻辑访存oracle与能力选择 | mask/stride/模式和累计用例选择规则 |
+| [trace_contract.py](examples/trace_contract.py) | 版本、地址别名、搬运和消费顺序 | 拒绝错序、缺生产者与早复用等证据反例 |
+| [jit_entry.py](examples/jit_entry.py) | 标准`kernel[grid](...)`入口 | 真实调用记录与CompiledKernel产物身份 |
+| [check_plan.py](examples/check_plan.py) | JSON/MD/用例/ABI/XLSX一致性检查 | 设计数据同步，不能代替设备执行 |
 
 | 阶段 | 新增语法或语义 | 同时接入的方言 | 测试数量 | 源码入口 |
 | --- | --- | --- | --- | --- |
 | S0 | @triton.jit、标量指针、tl.load/store | tt + 标准方言；暂不造 Coral 方言 | 2 | scalar_copy |
-| S1 | 标量 INT32、constexpr、加法和回绕 | LLVM/Arith/CF；实现真实 ELF 链 | 5 | scalar_add, scalar_copy |
+| S1 | 标量 INT32、constexpr、加法和回绕 | LLVM/Arith/CF；实现真实 ELF 链 | 7 | empty_kernel, scalar_add, scalar_copy |
 | S2 | arange、广播、mask/other、where、constexpr if | TTIR → 标准循环/LLVM；不提前建完整方言 | 17 | block_add, block_select, masked_other |
-| S3 | `kernel[grid](...)`、constexpr 特化、运行参数 | 复用现有 IR；补 driver/launcher/buffer | 3 | block_add |
-| S4 | 二维 stride/广播、动态 for/while/标量 if | 同时移植最小 Ascend tts、Linalg/Tensor/SCF、Bufferization | 6 | loop_sum, scalar_while, strided_bias |
-| S5 | tl.sum/tl.max 与大逻辑 block | Linalg/Vector → RVV；无需新增普通算术方言 | 8 | reduce_max, reduce_sum |
-| S6 | 二维 program_id/num_programs 与 grid 语义 | 按调度语义新增 coral_rt；核内 IR 复用 | 6 | grid_ids |
-| S7 | 保持 block_add 源码，扩展存储执行语义 | 按副本/搬运需求新增 coral_mem | 5 | block_add |
-| S8 | tl.dot(INT8→INT32)、矩阵分块/尾部 | Linalg matmul → coral tile → 已验证 Zvt 接口 | 3 | matmul_i8 |
-| S9 | 按需求扩展类型；同一语法验证重叠 | 复用方言；只有新语义不能表达时才加操作/接口 | 3 | bf16_widen, block_add, fp32_add |
+| S3 | `kernel[grid](...)`、constexpr 特化、运行参数 | 复用现有 IR；补 driver/launcher/buffer | 26 | block_add, block_select, masked_other, scalar_add, scalar_copy, sum_scalars |
+| S4 | 二维 stride/广播、动态 for/while/标量 if | 同时移植最小 Ascend tts、Linalg/Tensor/SCF、Bufferization | 12 | loop_sum, scalar_while, strided_bias |
+| S5 | tl.sum/tl.max 与大逻辑 block | Linalg/Vector → RVV；无需新增普通算术方言 | 16 | reduce_max, reduce_sum |
+| S6 | 二维 program_id/num_programs 与 grid 语义 | 按调度语义新增 coral_rt；核内 IR 复用 | 12 | grid_ids |
+| S7 | 保持 block_add 源码，扩展存储执行语义 | 按副本/搬运需求新增 coral_mem | 7 | block_add |
+| S8 | tl.dot(INT8→INT32)、矩阵分块/尾部 | Linalg matmul → coral tile → 已验证 Zvt 接口 | 7 | matmul_i8 |
+| S9 | 按需求扩展类型；同一语法验证重叠 | 复用方言；只有新语义不能表达时才加操作/接口 | 6 | bf16_widen, block_add, fp32_add |
 
 ### 第一次运行：先分清三种结果
 
@@ -118,12 +123,14 @@ export CORAL_ADAPTER=/absolute/path/to/coral_test_adapter.py
 
 ### S1：标量语法与 AOT 执行
 
+空函数微步先运行 `dump_ttir.py --stage S1 --case S1.empty.frontend --output /tmp/coral-empty`。实现并注册转换pass后，用 `S1.empty.llvm` 的 ir 模式检查真实LLVM方言checkpoint；该用例不需要ELF、设备或访存，不计作G1执行通过。
+
 - 新增语法/语义：标量 INT32、constexpr、加法和回绕。
 - 实现练习：转换 scalar_copy → scalar_add → wrapper/链接 → core0 → 独立数值参考。
 - 方言与任务：LLVM/Arith/CF；实现真实 ELF 链；S1-01、S1-02、S1-03、S1-04、S1-05、S1-06。
-- 正例与边界：拷贝、换常量、INT32_MAX+1、同会话换 kernel。
+- 正例与边界：空函数前端/LLVM方言独立检查；拷贝、常量、回绕与换代码执行。
 - 负例及 native 检查：非法 ABI 不启动；损坏 ELF 的解析器单元负例也需移植到真实 loader 测试。
-- 本阶段用例：S1.copy、S1.add、S1.wrap、S1.reload、S1.bad-abi。
+- 本阶段用例：S1.empty.frontend、S1.empty.llvm、S1.copy、S1.add、S1.wrap、S1.reload、S1.bad-abi。
 - 出口：G1 必需依赖不增加 TTS/RVV/DMA/多核。
 
 从下面两个最小程序开始。编译签名中 X、Y 均为指向 INT32 的设备指针，DELTA 是编译期常量。
@@ -169,12 +176,12 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 
 ### S3：JIT 与特化调用
 
-- 新增语法/语义：kernel[grid](...)、constexpr 特化、运行参数。
+- 新增语法/语义：`kernel[grid](...)`、constexpr 特化、运行参数。
 - 实现练习：接通 JIT → 设备 buffer → 缓存身份 → 同会话重复调用。
 - 方言与任务：复用现有 IR；补 driver/launcher/buffer；S3-01、S3-02、S3-03、S3-04。
-- 正例与边界：三次连续调用：变输入命中、变常量失效；零 grid。
-- 负例及 native 检查：失效 buffer 不发任务；缺适配器直接失败而非 skip。
-- 本阶段用例：S3.cache、S3.zero-grid、S3.bad-buffer。
+- 正例与边界：S1/S2正例的标准JIT镜像、cache/零grid、v3六运行参数。
+- 负例及 native 检查：失效buffer、v2超容量在启动前拒绝；AOT路由不能通过JIT验收。
+- 本阶段用例：S3.cache、S3.zero-grid、S3.bad-buffer、S3.abi-v3、S3.abi-v2-capacity、S1.copy.jit、S1.add.jit、S1.wrap.jit、S1.reload.jit、S2.mask.n0.b16.jit、S2.mask.n0.b64.jit、S2.mask.n1.b16.jit、S2.mask.n1.b64.jit、S2.mask.n3.b16.jit、S2.mask.n3.b64.jit、S2.mask.n37.b16.jit、S2.mask.n37.b64.jit、S2.mask.n128.b16.jit、S2.mask.n128.b64.jit、S2.mask.n1000.b16.jit、S2.mask.n1000.b64.jit、S2.inplace.jit、S2.constexpr.1.jit、S2.constexpr.0.jit、S2.other.jit、S3.abi-v3.jit。
 - 出口：零 grid 可直接返回；不强制为零工作编译 ELF。
 
 ```bash
@@ -187,9 +194,9 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 - 新增语法/语义：二维 stride/广播、动态 for/while/标量 if。
 - 实现练习：读 strided_bias/loop_sum TTIR → 指针状态 → Linalg/SCF → Bufferization → LLVM。
 - 方言与任务：同时移植最小 Ascend tts、Linalg/Tensor/SCF、Bufferization；S4-01、S4-02、S4-03、S4-04、S4-05、S4-06。
-- 正例与边界：5×7、SX=11/SY=9、R=0/1/3、FLAG=0/1。
+- 正例与边界：二维stride/广播、R=0/1/3、FLAG=0/1的AOT/JIT；逻辑访问不碰padding。
 - 负例及 native 检查：用真实 pass verifier 测循环状态不一致、非法 Bufferization/容量；不能用宽松字符串替代。
-- 本阶段用例：S4.stride-broadcast、S4.loop.r0、S4.loop.r1、S4.loop.r3、S4.while.0、S4.while.1。
+- 本阶段用例：S4.stride-broadcast、S4.loop.r0、S4.loop.r1、S4.loop.r3、S4.while.0、S4.while.1、S4.stride-broadcast.jit、S4.loop.r0.jit、S4.loop.r1.jit、S4.loop.r3.jit、S4.while.0.jit、S4.while.1.jit。
 - 出口：新语法与 S0～S3 全部回归，之后收敛旧路径。
 
 ```bash
@@ -204,7 +211,7 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 - 方言与任务：Linalg/Vector → RVV；无需新增普通算术方言；S5-01、S5-02、S5-03。
 - 正例与边界：长度 1/3/37/1000、负数、尾部、BLOCK>VLEN。
 - 负例及 native 检查：用目标合法性测试拒绝未启用 ISA；无 RVV 轨迹不得报向量验收成功。
-- 本阶段用例：S5.reduce_sum.n1、S5.reduce_max.n1、S5.reduce_sum.n3、S5.reduce_max.n3、S5.reduce_sum.n37、S5.reduce_max.n37、S5.reduce_sum.n1000、S5.reduce_max.n1000。
+- 本阶段用例：S5.reduce_sum.n1、S5.reduce_max.n1、S5.reduce_sum.n3、S5.reduce_max.n3、S5.reduce_sum.n37、S5.reduce_max.n37、S5.reduce_sum.n1000、S5.reduce_max.n1000、S5.reduce_sum.n1.jit、S5.reduce_max.n1.jit、S5.reduce_sum.n3.jit、S5.reduce_max.n3.jit、S5.reduce_sum.n37.jit、S5.reduce_max.n37.jit、S5.reduce_sum.n1000.jit、S5.reduce_max.n1000.jit。
 - 出口：G5 后可并行走 S9-03 类型分支，case 选择不依赖多核。
 
 ```bash
@@ -219,7 +226,7 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 - 方言与任务：按调度语义新增 coral_rt；核内 IR 复用；S6-01、S6-02、S6-03、S6-04。
 - 正例与边界：1×1/5×13 grid、mask=1/3/15、65 programs 超过队列槽位。
 - 负例及 native 检查：调度计划 verifier 测非法核/私有 owner/环；轨迹检查遗漏、重复及错误核。
-- 本阶段用例：S6.grid.1x1.mask1、S6.grid.5x13.mask1、S6.grid.1x1.mask3、S6.grid.5x13.mask3、S6.grid.1x1.mask15、S6.grid.5x13.mask15。
+- 本阶段用例：S6.grid.1x1.mask1、S6.grid.5x13.mask1、S6.grid.1x1.mask3、S6.grid.5x13.mask3、S6.grid.1x1.mask15、S6.grid.5x13.mask15、S6.grid.1x1.mask1.jit、S6.grid.5x13.mask1.jit、S6.grid.1x1.mask3.jit、S6.grid.5x13.mask3.jit、S6.grid.1x1.mask15.jit、S6.grid.5x13.mask15.jit。
 - 出口：同一 program 初期放一个核；不是跨核拆分一个 tensor block。
 
 ```bash
@@ -233,8 +240,8 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 - 实现练习：区域/owner → 局部化 → DMA/wait → 可见完成 → 一核再多核。
 - 方言与任务：按副本/搬运需求新增 coral_mem；S7-01、S7-02、S7-03、S7-04、S7-05。
 - 正例与边界：257 元素、HBF→DRAM→DTCM→DRAM，1/4核，单缓冲。
-- 负例及 native 检查：HBF 写/owner 错误在启动前拒绝；DMA 中途失败验证部分输出、停止和恢复。
-- 本阶段用例：S7.tiers.mask1、S7.tiers.mask15、S7.hbf-write、S7.owner、S7.dma-mid。
+- 负例及 native 检查：HBF写、错误owner、DMA部分失败；错序、缺版本、早复用及错误回写由协议2校验器拒绝。
+- 本阶段用例：S7.tiers.mask1、S7.tiers.mask15、S7.hbf-write、S7.owner、S7.dma-mid、S7.tiers.mask1.jit、S7.tiers.mask15.jit。
 - 出口：不存在 tl.dma 扩展；事件不替代原子，同核 DMA/kernel 保持互斥。
 
 ```bash
@@ -247,9 +254,9 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 - 新增语法/语义：tl.dot(INT8→INT32)、矩阵分块/尾部。
 - 实现练习：先补 min_dot_size → 合法源 TTIR → 矩阵语义 → tile → Zvt。
 - 方言与任务：Linalg matmul → coral tile → 已验证 Zvt 接口；S8-01、S8-02、S8-03、S8-04。
-- 正例与边界：16×16×32 与 17×19×35，stride/padding、1/4核。
-- 负例及 native 检查：真实回调拒绝未支持类型/形状；tile verifier 测布局、signedness 和状态错误。
-- 本阶段用例：S8.dot.16x16x32.mask1、S8.dot.17x19x35.mask1、S8.dot.17x19x35.mask15。
+- 正例与边界：v3承载六运行参数，16×16×32/17×19×35的AOT/JIT与1/4核。
+- 负例及 native 检查：v2容量拒绝、未支持shape/dtype诊断、Zvt状态/verifier。
+- 本阶段用例：S8.dot.16x16x32.mask1、S8.dot.17x19x35.mask1、S8.dot.17x19x35.mask15、S8.reject-v2、S8.dot.16x16x32.mask1.jit、S8.dot.17x19x35.mask1.jit、S8.dot.17x19x35.mask15.jit。
 - 出口：教程 dot 下界仅用于前端提案试验，不能替代后端回调或执行证据。
 
 ```bash
@@ -264,41 +271,72 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 - 方言与任务：复用方言；只有新语义不能表达时才加操作/接口；S9-01、S9-02、S9-03。
 - 正例与边界：双缓冲与单缓冲结果对照；可选有限 FP32 加法、BF16 输入扩宽。
 - 负例及 native 检查：无跨核时间重叠则不报重叠通过；保持同核互斥；浮点非有限值测试需继续扩展。
-- 本阶段用例：S9.overlap、S9.fp32、S9.bf16。
-- 出口：G9 重叠与类型能力分开验收，BF16 扩宽不宣称 BF16 算术支持。
+- 本阶段用例：S9.overlap、S9.fp32、S9.bf16、S9.overlap.jit、S9.fp32.jit、S9.bf16.jit。
+- 出口：按能力ID与执行模式登记已通过项，自动加入累计回归；有限浮点样例不外推完整语义。
 
 ```bash
 "$CORAL_PYTHON" "$CORAL_TUTORIAL/run_stage.py" --stage S9 --adapter "$CORAL_ADAPTER" --output "$CORAL_TEST_OUT/device"
 "$CORAL_PYTHON" "$CORAL_TUTORIAL/run_stage.py" --stage S9 --cumulative --adapter "$CORAL_ADAPTER" --output "$CORAL_TEST_OUT/regression"
 ```
 
-### 真实执行适配器协议
+### 真实执行适配器协议（版本2）
 
-本次提供测试源码和校验器，不实现新的 Coral 编译后端或执行适配器。适配器由每阶段实现工作接通实际 compiler/runtime，可先只支持 S0，再逐步增加 case。不能导入 suite 的 expected 计算设备结果。
+本次实现的是教程样例、参考codec和证据校验器。真实compiler/runtime适配器、ABI v3固件以及设备采集仍待相应任务实现；主机合成轨迹只用于校验器自检。
 
-1. 调用方式为同一 Python 解释器执行 `coral_test_adapter.py --request request.json --response response.json`。请求含 protocol=1、nonce、request_sha256、kernel_source_sha256、mode、core_mask、steps、features 和可选故障配置；steps 的 expected 已剥离，只保留 output_bindings 的名称。按 kernel 名从 kernels.py 取函数，按 dtype 建签名，scalars 为运行参数，constants 为 constexpr，grid 是三轴逻辑尺寸。
+1. 调用方式仍为同一解释器执行 `coral_test_adapter.py --request request.json --response response.json`。请求/响应的protocol必须为2；旧协议拒绝，不静默降级。nonce、request_sha256、kernel_source_sha256、pipeline=current-mainline绑定同一次调用。expected不发送，仅发送output_bindings。
+2. mode有四种：frontend只验证真实TTIR；ir检查真实LLVM方言checkpoint（不要求ELF/启动）；aot经过实际AOT桥；jit必须通过[jit_entry.py](examples/jit_entry.py)调用真正的`kernel[grid](...)`，明确选择Coral driver。S1/S2在S3新增JIT镜像，S4～S8新语法均有AOT/JIT镜像。
+3. 顶层build产物记录Triton/LLVM/Coral提交、target、abi/abi_version、源码哈希及pipeline；实际执行的每步另提供invocation记录api/backend/kernel/grid/request_sha256/step和CompiledKernel返回ELF的哈希。jit的api为`kernel[grid](...)`，aot为aot_bridge；执行ELF必须与调用产物相同。记录须来自真实入口与工具，不能按请求直接填成功。
+4. 每个artifact为{path,sha256}，路径位于本case目录内。frontend需要ttir及verification.ttir；ir另需要llvm_dialect及verification.llvm_dialect，允许empty_kernel没有load/store。aot/jit需要真实llir/elf/trace、verification.llvm/elf、execution=rtl或device与完整outputs。zero-grid可不编译ELF，但需标准JIT调用记录、无launch轨迹与未改变的输出。
 
-2. buffer 描述包含 dtype、逻辑 values、region 和可选 alias_of。alias_of= X 时 Y 必须绑定同一设备区，不能先用 Y 的哨兵覆盖 X。零长度绑定可保留合法最小分配，但逻辑长度仍为零，不得访存。所有输出完整回传，含 stride padding；额外红区不计入逻辑 values。
+#### 参数 ABI：G1保留v2，G3必须交付v3
 
-3. 成功响应含 protocol、nonce、request_sha256、status="ok"、artifacts 和与 steps 等长的 results。每个 artifact 为 {"path":"case 内相对路径","sha256":"真实文件哈希"}。顶层 build 文件记录 triton_commit、llvm_commit、coral_commit、abi、target、kernel_source_sha256 和 pipeline="current-mainline"。累计回归的旧 case 也必须走当前主线，不能按 case.stage 偷切旧实现。常量、ABI、ISA 和代码相关布局必须进入真实编译缓存身份。
+现有v2结构来自coralnpu的experiments/multicore/device/task_abi.h：abi=2、size=68，3个binding/4个scalar，done位于offset64。S1/S2继续使用它。S3-02必须同时实现下表v3，编译器wrapper、控制固件和参数打包器分别以版本解析，不能只改宿主codec。v3仍放在0x00010000的前256B参数预留区，size=128；S8六参数M/N/K/SA/SB/SC正例必须使用v3，v2仅作为容量负例。
 
-4. 每步 result 含 outputs、artifacts。前端模式需要 ttir 和 verification；verification JSON 含 ttir=true。执行模式还需 execution="rtl" 或 "device"、真实 llir/elf/trace；verification 增加 llvm=true、elf=true。这些标记必须来自真实工具返回码和检查，不是直接写常量。zero-grid 可不提供 TTIR/LLVM/ELF，但必须有无 launch 的 trace 和未改变的输出。
+| 字段 | 字节偏移 | 字节数 | 约定 |
+| --- | --- | --- | --- |
+| abi | 0 | 4 | 值3 |
+| size | 4 | 4 | 值128 |
+| program_id[3] | 8 | 12 | 三轴逻辑ID |
+| grid[3] | 20 | 12 | 三轴逻辑grid |
+| core_id | 32 | 4 | 物理核编号 |
+| binding_count | 36 | 4 | 0..8 |
+| scalar_count | 40 | 4 | 0..12 |
+| done | 44 | 4 | 设备完成标志地址 |
+| bindings[8] | 48 | 32 | RV32设备指针 |
+| scalars[12] | 80 | 48 | 32位运行参数，未用槽为0 |
 
-5. structured case 另提供 structured、bufferized checkpoint；Rvv/Zvt case 提供 disassembly，trace 中含实际执行的 rvv/zvt 事件。S3.cache 每步返回 cache_hit 和 kernel_cache_key，按 false/true/false 及前两 key 相同、第三不同检查。每个 case 在独立缓存目录开始，三个 steps 在同一适配器会话依次运行。
+所有字段小端32位，未用槽为0，binding_count<=8/scalar_count<=12。done是设备地址，不是内嵌布尔值；运行前校验其权限/范围/对齐。binding和scalar分别按函数声明中的运行参数顺序编号，constexpr不入帧；完整参数到槽位的映射写入编译产物metadata，不能依赖JSON字典排序。当前运行scalar只支持i32/u32字编码，其他类型须显式扩展，不得截断。零grid不创建执行帧。[abi.py](examples/abi.py)是已测试参考打包器，不代表固件已实现v3。S3.abi-v3及其JIT镜像验证六运行参数，S3.abi-v2-capacity/S8.reject-v2验证拒绝超容量。
 
-6. trace 是 {"events":[...]}。launch 事件字段为 program=[x,y,z]、core、start、end；access 为 binding、index、count，单位是该 binding 的元素；guard_check 含 ok。DMA 含 source、destination、core（关联计算核）、start、end、bytes、success。所有时间戳使用同一设备周期时基。不得以宿主耗时混入；bounds_violation 或 trap 导致失败。适配器需要解析真实轨迹并保留原始日志，不能仅用期望 grid 反向生成事件。
+#### 逻辑访存与物理搬运分开
 
-7. 负例响应 status="error"，diagnostic 含 code/stage/message，并提供 build/trace。前置错误不能出现 launch；DMA 中途错误需 dma_error/completed_bytes>0、quiescent=true，以及 recovery 文件中 old_handles_invalid/restart_verified 的真实恢复证据。NC_ABI_VERSION、NC_UNSUPPORTED_SHAPE、NC_INVALID_BUFFER、NC_READ_ONLY、NC_OWNER 等是本测试协议的诊断分类，适配器将实际错误映射到它们，不要求固件已有同名常量。
+trace={protocol:2,arguments:{binding:view_id},views:{view_id:描述},events:[...]}。每个view含binding、indices、region、address、owner、allocation、generation：indices把连续物理元素映射到全局buffer逻辑下标，address为该view首字节的RV32设备地址。DTCM owner必须是所属核，其他region的owner为null。arguments指向原始分配，包含完整逻辑范围；别名view必须映射到相同物理字节。
 
-   S7.hbf-write 将输出 Y 放入 HBF；S7.owner 将 Y 放在 owner=3 的私有 DTCM，而请求只启用 core0。S7.dma-mid 要求在已成功搬运 16 字节后注入 DMA 错误。S3.bad-buffer 的 invalidate=X 表示分配后使 X 句柄失效，再验证启动被拒绝；不能把这些负例改成合法请求后返回预期错误码。
+当前alias_of只声明同dtype、等长的精确原地view，不单独分配或用Y的初始哨兵覆盖X。部分重叠、跨dtype重解释等访问必须增加独立用例与oracle，或按当前支持边界明确诊断；这不表示它们在Triton中普遍非法。JIT的device_buffers必须是真实Coral设备buffer对象，由driver正确识别；不能用宿主数组或整数地址代替标准JIT参数。
 
-8. S9.overlap 必须先运行单缓冲对照，再返回 single_buffer_comparison（outputs、single_cycles、double_cycles）。轨迹须显示不同核之间 DMA/计算时间重叠，同核互斥保持。测试不预设必有加速；周期分析要解释调度成本和硬件限制。当前简版比较文件检查结果/周期，原始单缓冲日志及资源存活证明仍是人工验收项。
+- launch含唯一id、三轴program、core、start/end和reads/writes引用；每个引用为{view,version}。start/end是核实际执行区间，排队时间不能填入；同一核的program区间不得重叠。
+- access含launch、binding、mode=read/write、view、version、index/count，index/count为逻辑元素下标/数量。校验器依据[access.py](examples/access.py)逐program检查mask、stride和方向；同一分配内的padding也不能被逻辑访问，不能只检查数组总长度。真实轨迹应采集退休后的逻辑访存，不把cache miss日志误当完整访问。
+- DMA是独立的物理搬运事件，含唯一id、src/dst版本引用、source/destination region、core、start/end、bytes、success。view的逻辑下标/顺序和dtype必须保持，实际地址和字节数满足4B对齐，不支持重叠拷贝或HBF写；当前单DMA通道不能超发。
+- DMA为满足粒度需要可搬运已经分配且允许读取的padding，必须在view中明确列出，不能越出allocation，也不能因此允许kernel逻辑读写mask=false的lane。非连续物理段应拆分成合法copy，禁止用向外取整掩盖越界。
 
-适配器是受信任的证据采集端。文件哈希、nonce 和结构检查能发现缺失/错配，不能认证一个伪造适配器真的运行了硬件。人工审查源码→IR→ELF→原始设备日志的来源链仍然必要。适配器超时退出不表示核或 DMA 已停止；脚本会停止后续用例，设备须按恢复协议确认停止或复位后才能复用。
+#### 数据版本、完成可见性与复用
+
+版本0仅代表原始参数区的初始内容及可证明的物理子view；局部副本不能凭空声明版本0。每个正版本必须由唯一DMA或kernel写入产生。校验器要求生产者end<=消费者start；DMA的end须对应真实消费者可见完成（含最终成功写响应），不是入队或宿主callback时刻。
+
+kernel的逻辑读写必须引用它声明的版本。DMA用例中kernel应读写自己核的DTCM副本，输入要有对应搬入链，输出要经计算后的回写链到真实输出地址；仅出现HBF/DRAM/DTCM路径边不足以验收。任何其他写入若覆盖仍在消费的物理字节，或读引用已经被更新覆盖的旧版本，均拒绝；allocation/generation区分存储复用。
+
+所有时间戳使用同一设备周期时基。guard_check须成功；rvv/zvt事件关联具体launch、core、PC和执行周期，不能用控制CPU或别的kernel指令充数。区域容量、权限、实际地址可达性和ELF装载仍须由TargetSpec/静态资源验证器与真实loader检查，轨迹结构校验不能替代这些硬件检查。
+
+#### 错误、缓存和优化
+
+负例status=error，diagnostic含code/stage/message。NC_ABI_VERSION、NC_ABI_CAPACITY、NC_INVALID_BUFFER、NC_READ_ONLY、NC_OWNER等是测试分类，适配器映射真实诊断。进入被测调用后，前置错误不得启动kernel/DMA或执行tensor访存；测试输入的预置初始化属于调用前准备。S7.dma-mid在成功搬运16B后注入错误，需dma_error/completed_bytes>0、真实停止确认及旧句柄失效/重启的恢复证据；部分输出不回滚。
+
+S3.cache在同一会话依次执行三步，cache_hit=false/true/false，前两key相同第三不同；计时、原始缓存日志和代码身份对应。S9.overlap仍需单缓冲结果及周期对照、真实跨核DMA/计算重叠，并保持同核互斥；它不自动证明有加速，原始日志和资源生命周期仍需审查。
+
+适配器是受信任的证据采集端；哈希和结构检查不能认证伪造文件。必须保留源码→IR→ELF→实际入口→原始设备轨迹的来源链。超时退出不等于核/DMA停止，确认停止或复位前不得复用资源。
 
 ### IR 检查、构建与增量回归
 
-先使用 dump_ttir.py 生成真实源程序的 TTIR，再从对应文件建立 lit/FileCheck 回归；不要为让 pass 测试通过编写前端不可达的 IR。提供的前缀分别是 SCALAR、BLOCK、STRIDE、LOOP、WHILE、REDUCE、GRID、DOT、STRUCTURED、FINALLLVM，必须对匹配的样例/checkpoint 单独使用。FileCheck 结构匹配不能代替 MLIR/LLVM verifier。
+先使用 dump_ttir.py 生成真实源程序的 TTIR，再从对应文件建立 lit/FileCheck 回归；不要为让 pass 测试通过编写前端不可达的 IR。提供的前缀分别是 EMPTY、SCALAR、BLOCK、STRIDE、LOOP、WHILE、REDUCE、GRID、DOT、EMPTYLLVM、STRUCTURED、FINALLLVM，必须对匹配的样例/checkpoint 单独使用。FileCheck 结构匹配不能代替 MLIR/LLVM verifier。
 
 ```bash
 # CORAL_LLVM 指向固定 Coral SDK 的实际安装目录；其中需已构建 FileCheck/opt。
@@ -311,6 +349,18 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 
 每次只加一个操作或一种类型：先让其正例与边界通过，再加失败诊断，再跑所有已支持语法。新语法和硬件优化分别记录支持状态；迁移方言期间同一源程序做差分，旧路径只保留到覆盖一致。
 
+### 支持能力与自动一致性检查
+
+任务、阶段和语法白名单以plan.json为统一数据源，正文与Excel同步展示；案例以suite.py的稳定ID维护。修改时先更新数据，再同步展示并运行下方检查，避免只改一张表。检查涵盖任务要求、阶段范围、ABI容量、用例清单和Excel白名单。
+
+```bash
+"$CORAL_PYTHON" "$CORAL_TUTORIAL/check_plan.py" --workbook
+```
+
+默认testing.validated_capabilities为空，因为目前没有新增设备能力的执行验收。能力ID明确区分fp32.basic.aot、fp32.basic.jit、bf16.basic.aot、bf16.basic.jit。只有实际在指定工具链/目标配置验收通过后才登记；环境不同可用--capabilities加载包含validated_capabilities的目标专用JSON清单。
+
+已登记模式自动进入--cumulative，包括G5后提前完成的S9类型分支。例如登记fp32.basic.aot后，S6累计回归会包含S9.fp32，不会错误加入尚未验证的BF16或FP32 JIT。--case只检查指定用例，不代表阶段累计出口通过；--include-optional用于主动尝试未验收项，不能自动登记支持。
+
 ### 可独立推进的类型分支
 
 S9-03 仅依赖 S5-03。G5 后可以暂缓多核/存储优化，直接选择下面的有限浮点样例。默认 G9 测试不自动包含 optional。BF16 入门例只测 BF16 输入读取、扩宽和 FP32 输出；尚不覆盖 BF16 算术、特殊值、舍入、所有格式或数学函数。后续每个精度/操作组合应新增稳定 case ID 和独立参考，再扩大支持表。
@@ -322,9 +372,9 @@ S9-03 仅依赖 S5-03。G5 后可以暂缓多核/存储优化，直接选择下�
 
 ### 当前源码验证与尚缺能力
 
-20 个特化在独立前端选项下通过当前 Coral codegen hook 路径；加入显式教程 INT8 下界后共 23 个特化通过。尚无新 ELF/设备执行证据。
+22 个特化在独立前端选项下通过当前 Coral hook 路径；加入显式教程INT8下界后共25个特化通过。新增empty_kernel和六运行参数源码仅验证前端可达；尚无新ELF/设备执行证据。
 
-11 项主机侧自检通过；8 个前端 FileCheck 前缀通过（使用 compiler-1 的 LLVM 21 FileCheck，仅检查模式文本）。STRUCTURED/FINALLLVM 仍待真实 lowering 产物；这些结果不计作固定 Coral LLVM 24 代码生成或设备执行通过。
+32 项主机侧自检用于ABI、访存、版本依赖、JIT路由及设计一致性。9个前端FileCheck前缀通过（使用LLVM21，仅匹配模式）；LLVM方言/最终LLVM及实际JIT/固件仍待实现验收。
 
 4f045a9d77 的 get_codegen_implementation 返回空字典，dot 缺少 min_dot_size。前端脚本补充的语言选项也须在正式 CoralOptions 中按能力落实。
 
@@ -406,16 +456,16 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 | 对象 | 必须保留的约定 | 何时实现 | 当前原型 | 验证要求 |
 | --- | --- | --- | --- | --- |
-| 最小 ABI | 版本、参数布局、设备地址、逻辑 ID/grid | S0 约定；S1 执行；S3 通用化 | 现有 v2（`0x00010000`，`bindings[3]`/`scalars[4]`，`done` 为完成标志地址）可用于 S1/S2 | 兼容扩展带版本，超槽位参数在 S3/通用算子阶段报错或升级 v3，单核与多核复用明确协议 |
+| 最小 ABI | 版本、参数布局、设备地址、逻辑 ID/grid | S0 约定；S1 执行；S3 通用化 | 当前v2 68B/3 binding/4 scalar；规划v3 128B/8 binding/12 scalar | G1只用v2；S3-02必须交付v3，S8六scalar以v3执行。版本/size/count及越界一致检查 |
 | 核拓扑 | 物理核数、可用掩码、逻辑 grid 分开 | S0 记录；S6 实现完整 placement | 当前物理 4 核，可启用子集 | 实际 1/2/4 核子集执行；未来 N 核先静态检查 |
 | 共享全局地址 | region、合法范围、预留区与权限 | S0 约定；S1/S2 实际使用 | 共享 SRAM 16 KiB；trace 区预留 | 真实指针及保护区受检，不把宿主地址当设备地址 |
-| 每核 ITCM/DTCM | 所属核、加载段、参数、栈和 scratch | S1 最小容量检查；S6/S7 扩展 | 当前每核 ITCM 8 KiB（`.text` 末 256B NOP 填充）、DTCM 32 KiB（前 256B 参数、中 `0x6f00` 数据、顶 4 KiB 栈） | 私有区逐核分配，容量/存活区不重叠；控制 LLVM 循环展开避免 ITCM 溢出 |
+| 每核 ITCM/DTCM | 所属核、加载段、参数、栈和 scratch | S1 最小容量检查；S6/S7 扩展 | 当前每核 ITCM 8 KiB（.text 末 256B NOP 填充）、DTCM 32 KiB（前 256B 参数、中 0x6f00 数据、顶 4 KiB 栈） | 私有区逐核分配，容量/存活区不重叠；控制 LLVM 循环展开避免 ITCM 溢出 |
 | HBF | 只读来源、有效范围、合法访问路径 | S0 记录约束；S7 实现搬运 | 窗口 [0x80000000,0xc0000000) | 拒绝计算平面的写入；窗口大小不等同实际物理容量 |
 | 3D DRAM | 读写、容量、布局和生命周期 | S0 记录约束；S7 使用 | 窗口 [0x60000000,0x70000000) | 只承担存储；staging 显式，缓存策略另行设计 |
 | 分片及局部副本 | 全局 tensor、分片范围、局部 owner | S2 保持逻辑索引；S6/S7 落实 | 先共享地址，再显式局部化 | 不重复添加 program 偏移，禁止错误共享私有存储 |
 | 访问可达性 | CPU、核、DMA 到各 region 的合法路径 | S0 记录当前使用路径；S7 校验全图 | 当前 AXI 与 host 窗口 | 每项 copy 都有路径，不假设任意两层可互拷 |
 | DMA 资源 | 通道、粒度、对齐、并发和互斥 | S7 实现；S9 优化 | 当前单通道、4B 对齐、单 outstanding beat | 不超发；不能靠扩大拷贝范围处理不合法尾部 |
-| 任务与可见性 | 启动、生产者完成、消费者可见和失败 | S1 基本完成；S6/S7 完整依赖 | 当前无一致性缓存；DMA 等待最终成功写响应 | 后继等待可见完成；序号匹配，超时后未停止不得复用，DMA 失败可有部分输出 |
+| 任务与可见性 | 启动、生产者完成、消费者可见和失败 | S1 基本完成；S6/S7 完整依赖 | 当前无一致性缓存；DMA 等待最终成功写响应 | 版本生产者可见完成早于消费者；回写晚于计算，旧副本/过早复用拒绝；失败保留部分输出，恢复后再复用 |
 | 队列与事件 | 槽位、fan-in、generation 与引用回收 | S6 完整实现 | 32 任务槽、64 事件、最多 2 直接前驱 | 长 grid 窗口式提交，失败不被伪报成功 |
 | LLVM 地址与类型 | 物理映射和 LLVM address space 分开 | S1 确立；S4/S7 持续保留 | RV32、小端；TTIR 使用固定宽度整数 | index 降低匹配 data layout；不能静默截断或任意赋空间编号 |
 | 缓存身份 | SDK/补丁、ABI、生成器与影响代码的布局 | S3 基础缓存；S6/S7 扩展计划标识 | kernel 与 Launch Plan 可分开缓存 | 拓扑变化重规划；代码相关布局变化重新编译 |
@@ -481,7 +531,7 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 | --- | --- | --- | --- | --- |
 | D01 | 参数与调用 ABI | RV32/ILP32、小端、字段偏移/宽度/对齐、16B 栈对齐、保留区和协议版本形成一张明确布局表。 | 固件与 wrapper 对同一参数样本解码一致，拒绝版本/范围错误。 | S0-02,S1-02 |
 | D02 | ELF 与装载 | 静态链接；约定段地址字段、检查文件/内存范围、加法溢出、入口、BSS、段权限和 ISA 属性；未解析运行库 helper 明确失败。 | 损坏、截断、重叠、越界、入口错误及未支持指令均有诊断。 | S1-03,S1-04 |
-| D03 | 整数与 mask 语义 | INT32 模运算和 signed/unsigned 扩展清楚；不能擅加 LLVM 溢出承诺；other 未定义时不要求其无效 lane 为零。 | O0/O2 最小用例、边界整数、全假/混合 mask 与无 UB 参考。 | S1-01,S2-02,S2-04 |
+| D03 | 整数与 mask 语义 | INT32 模运算和 signed/unsigned 扩展清楚；不能擅加 LLVM 溢出承诺；other 未定义时不要求其无效 lane 为零。 | 全假/混合mask、stride padding禁读写及O0/O2参考；逻辑访存与物理DMA分别验证。 | S1-01,S2-02,S2-04 |
 | D04 | 别名与标量化 | 保留 block tensor SSA 的 load/compute/store 次序；不相交、精确原地和部分重叠区分处理。部分重叠不等于普遍非法 Triton。 | 合法原地结果正确，部分重叠按已声明策略保持语义或诊断，不能静默误算。 | S2-01,S4-05 |
 | D05 | 启动与完成身份 | 提交序号、完成序号、核与镜像身份关联；旧完成清理和代码装载后的取指可见性按真实硬件确认。 | 连续切换代码、输入及核时不串扰；旧完成和过期句柄不会完成新调用。 | S1-05,S6-03 |
 | D06 | JIT 运行协议与计时 | 明确零 grid、串行 stream、buffer 生命期和冷启动桥的行为；区分编译/装载/启动开销与设备 kernel 周期。 | 重复调用、零工作、异步误用/失效对象和缓存配置变化有结果或清晰诊断。 | S3-01,S3-02,S9-01 |
@@ -492,7 +542,7 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 | D11 | program 到核的映射 | 一个 program 初期完整放在一个核，逻辑 tensor 在核内分段执行；多个 program 通过调度分配到可用核。核内 barrier 与跨 program 依赖分开。 | 单核顺序与多核执行一致；grid 大于核数、BLOCK 大于 VLEN 均正确。 | S2-03,S6-02,S6-04 |
 | D12 | 浮点及数学语义 | 浮点/BF16 配置启用只作硬件基础。按 dtype 和操作验证类型提升、转换、舍入、NaN/Inf/非正规数/正负零、FMA 与归约误差。 | 按固定版本和精度约定比较独立参考；软件展开与原生路径分别记录，未验收格式明确拒绝。 | S0-01,S5-03,S9-03 |
 | D13 | 原子与调度进展 | 设备原子须覆盖相关核和访问路径的不可分割读改写、返回值、内存序与作用域；队列事件和 AXI 仲裁不构成原子证明。跨 program 轮询另定义进展条件。 | 并发冲突更新、CAS/旧值、发布订阅及支持的轮询场景通过；不支持作用域或数据类型显式诊断。 | S6-02,S6-04,S9-03 |
-| D14 | 局部副本与可见性 | 保留 DRAM 全局 buffer 和 SRAM/DTCM 副本的别名身份、读写集合、owner、写回和失效规则；完成事件明确表示目标消费者可观察数据。 | 跨核生产消费、重叠 view、buffer 复用和 DMA 背压不出现陈旧副本或提前消费。 | S7-02,S7-03,S7-05 |
+| D14 | 局部副本与可见性 | 保留 DRAM 全局 buffer 和 SRAM/DTCM 副本的别名身份、读写集合、owner、写回和失效规则；完成事件明确表示目标消费者可观察数据。 | 正例与输入DMA晚于计算、回写早于计算、无版本、陈旧副本、错误owner/回写及早复用反例。 | S7-02,S7-03,S7-05 |
 | D15 | 大容量和地址窗口 | 区分物理容量、32 位映射窗口、设备指针与 i64 数据计算。窗口切换若引入，需规定映射版本、指针有效期和在途任务互斥。 | 地址加法溢出和跨窗口访问有诊断或已验证分块；旧指针不得静默指向新窗口。 | S0-02,S7-01 |
 | D16 | 高级接口与运行时边界 | descriptor 独立降低到合法访存/DMA，保持 shape/stride/padding；内联汇编匹配 RISC-V 目标。厂商专用接口和完整 Torch 设备适配不自动计入通用支持。 | descriptor 的边界/布局/对齐及错误输入逐项验证；不支持的 PTX/接口明确诊断，JIT/计时/调试分别留证。 | S3-01,S3-04,S9-03 |
 
@@ -502,23 +552,24 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 ## 分阶段支持的 Triton 语法与方言白名单
 
-为避免一次铺太开，下表明确每一阶段**支持什么 Triton Python 语法**、**对应什么 MLIR Op/Type**、**是否新增方言**，以及**明确拒绝什么语法**。具体骨架起步与 S0-03/S1-01 微步示例见 [backend-skeleton.md](backend-skeleton.md)。
+任务、阶段和本表统一来自 plan.json，代码只声明逐项已验收能力。S4不含归约，S5才新增tl.sum/tl.max；S1源白名单仅标量拷贝和常量加法。backend-skeleton.md提供微步讲解。
 
-| 阶段 | 支持的 Triton Python 语法 | 对应的 MLIR Op / Type | 方言策略（是否新增） | 本阶段明确不支持（须报错） |
+| 阶段 | 支持的Triton语法/语义 | 对应IR/执行 | 方言与接口策略 | 明确边界 |
 | --- | --- | --- | --- | --- |
-| 骨架（已完成） | `@triton.jit` 单元素 `tl.load(ptr)` / `tl.store(ptr, x)`（仅编译到 TTIR + 占位 ELF） | `tt.func`, `!tt.ptr<T>`, `tt.load`, `tt.store`, `tt.return` | **不新增方言**；仅复用原生 `tt` | 真实 LLVM IR/ELF 生成、硬件执行、`x + 1`（缺 `sanitize_overflow` 前） |
-| **S0-03（下一步第 1 小步）** | 单元素标量拷贝 `x = tl.load(in_ptr); tl.store(out_ptr, x)` 与加一 `tl.store(out_ptr, x + 1)`（`*i32` 参数，`grid=1`） | 新增 `arith.constant`, `arith.addi`（标量 `i32`） | **不新增方言**；仅复用原生 `tt` + `arith` | `tl.arange`、`tensor<Nxi32>`、mask/other、`program_id`、浮点 |
-| **S1-01a（下一步第 2 小步）** | 仅函数签名与空返回（`@triton.jit def f(p: *i32): pass` 或最小 IR 测试） | `tt.func` / `!tt.ptr<i32>` / `tt.return` $\to$ `llvm.func` / `!llvm.ptr` / `llvm.return` | **不新增方言**；复用标准 `LLVM` 方言 | 所有访存与算术（先跑通 Pass 架子与 `triton-opt`） |
-| **S1-01b（下一步第 3 小步）** | 单元素标量 INT32 拷贝（`tl.load(in_ptr)` / `tl.store(out_ptr, x)`，无 mask/other） | `tt.load` / `tt.store`（标量 `i32`）$\to$ `llvm.load` / `llvm.store`（4B 对齐） | **不新增方言**；复用标准 `LLVM` 方言 | 带 `mask`/`other` 的访存、非 `i32` 类型、tensor 指针 |
-| **S1-01c（下一步第 4 小步）** | 单元素标量 INT32 算术（`+`, `-`, `*`, 位运算等）与简单控制流，通过 RV32 LLVM Verifier | `arith.*` / `cf.*` $\to$ 复用 `ArithToLLVM` / `ControlFlowToLLVM`；附着 RV32 triple 与 32 位指针 data layout | **不新增方言**；复用标准 `arith` / `cf` / `LLVM` | `tl.arange` / tensor、有符号/无符号溢出承诺 `nsw`/`nuw`、除法 helper |
-| S1-02～S1-06 | 与 S1-01c 相同；接入裸机启动包装、链接脚本、AOT 打包与 core0 真实执行 | LLVM IR $\to$ 固定 SDK `clang`/`ld.lld` $\to$ RV32 静态 ELF32 | **不新增方言** | 标准 JIT、多 program、block 向量、DMA、RVV |
-| S2（G2） | `tl.arange(0, BLOCK)`、`tl.program_id(0)`、`tl.num_programs(0)`、指针偏移 `ptr + offs`、广播、`mask`/`other` 条件访存、整数比较与 `tl.where` | `tt.make_range`, `tt.splat`, `tt.broadcast`, `tt.addptr`, `tt.get_program_id`, `tt.get_num_programs`, `arith.cmpi`, `arith.select` $\to$ `scf.for` 标量循环 + `scf.if` | **不新增方言**；复用标准 `scf` / `arith` / `cf` / `LLVM` | 任意 gather/scatter、浮点、原子操作、RVV、TTS/Linalg |
-| S3（G3） | 标准 `kernel[grid](buf_in, buf_out, N, BLOCK=...)` JIT 调用、设备 buffer 分配/拷贝与缓存 | 同 S2，补齐 `CoralDriver` 启动器与设备 buffer ABI | **不新增方言** | 完整 PyTorch 设备适配、常驻 mailbox |
-| S4（G4） | 将 S1～S3 已支持语法 + 规则 2D 访问与基础整数归约（`tl.sum`）迁移到结构化流水线 | `tt` $\to$ `tts.get_structured_state` $\to$ `linalg.generic` / `tensor.extract_slice` $\to$ `memref` / `bufferization` $\to$ `LLVM` | **选择性移植 Ascend `tts` 方言** + 复用标准 `linalg` / `tensor` / `memref` / `bufferization` | 整套 CANN/HIVM 后端、`tl.dot`（留到 S8） |
-| S5（G5） | S4 全部语法生成真实 RVV 128-bit（`Zve32x`）向量与归约指令 | `linalg` $\to$ `vector`（strip mining + mask + 归约）$\to$ RVV 机器码 | **不新增自定义方言**；复用标准 `vector` 方言 | 任意未验证 VLEN、浮点归约（另行验收） |
-| S6（G6） | 同一套 Triton kernel 在 1/2/4 可用物理核子集上并发调度执行 | `coral_rt.launch` / `dispatch` / `join`（拟议）$\to$ 控制 CPU 队列/事件 API | **新增 `coral_rt` 控制方言** | 隐式全局所有 program barrier |
-| S7（G7） | HBF（只读）$\to$ 3D DRAM $\to$ 核内 DTCM $\to$ 计算 $\to$ DRAM 回写的显式分层搬运 | `coral_mem.region` / `view` / `copy_async` / `wait`（拟议）$\to$ `NC_COPY`/`NC_KERNEL` | **新增 `coral_mem` 存储搬运方言** | 计算平面写 HBF、同核 DMA/kernel 并发（默认互斥） |
-| S8（G8） | 合法前端 `tl.dot`（先 INT8 $\to$ INT32，再按需扩展 BF16/FP32）映射到 Zvt 矩阵子块 | `tt.dot` $\to$ `linalg.matmul` $\to$ `coral.tile_mma`（拟议）$\to$ Zvt 指令/微内核 | **新增 `coral` 目标计算方言** | 非法前端 dot 形状、把 INT8 通过推广为 BF16/FP32 通过 |
+| 骨架 | @triton.jit 的标量拷贝，仅 TTIR/占位产物 | tt.func / tt.load / tt.store / tt.return | 原生 tt；不新增方言 | 真实 ELF/执行仍待实现 |
+| S0-03 | scalar_copy、scalar_add 的前端检查 | tt + arith.constant/addi | 补齐正式 CoralOptions；不新增方言 | block/mask、浮点、原子 |
+| S1-01a | empty_kernel(X,Y): pass；指针在 ASTSource.signature 中声明 | tt.func / !tt.ptr<i32> / tt.return → LLVM 方言 | 标准 LLVM；编译检查模式 ir | load/store/算术尚不进入这个微步 |
+| S1-01b | 单元素 INT32 无 mask 拷贝 | tt.load/store → llvm.load/store | 标准 LLVM；运行接口保证4B对齐 | tensor指针、带mask访存、其他dtype |
+| S1-01c | INT32 常量加法、constexpr 与回绕 | arith.constant/addi → LLVM IR | 标准算术转换；内部CFG按需降低 | 其他源算术、动态分支逐项扩展；不擅加nsw/nuw |
+| S1-02～06 | 同一标量子集的真实 AOT | LLVM IR → 静态 ELF → core0 | 入口/链接/装载，v2足够 | JIT、block、RVV、DMA、多核 |
+| S2 | arange、广播、mask/other、where、逻辑program/grid | tt.make_range/addptr/broadcast + arith → scf/cf/LLVM | 正确标量循环；不新增方言 | 任意gather/scatter、浮点、原子 |
+| S3 | 标准`kernel[grid](...)`、缓存与v3六运行参数 | 同S2 + driver/launcher/参数codec | 运行接口，v3为本阶段必需交付 | 完整Torch设备适配；超v3容量明确拒绝 |
+| S4 | 二维stride/广播、运行时for/while/标量if；不含tl.sum | tt → 最小tts分析 + Linalg/Tensor/SCF → Bufferization | 选择性移植Ascend tts，复用标准方言 | tl.sum/tl.max留S5，dot留S8 |
+| S5 | tl.sum/tl.max 与已支持语法的整数RVV | Linalg/Vector → RVV | 不新增普通算术方言 | 未验证VLEN和浮点模式 |
+| S6 | 二维program_id/num_programs、多核调度 | coral_rt → 控制CPU任务/事件 | 新增所需控制语义 | 隐式全grid barrier/未声明协作进展 |
+| S7 | 同一源码在HBF/DRAM/DTCM显式局部化 | coral_mem → copy/wait与版本依赖 | 新增存储/搬运语义 | HBF写、未证明复用及同核DMA/kernel并发 |
+| S8 | INT8 dot、v3六运行参数、矩阵分块 | tt.dot → Linalg → coral tile → Zvt | 新增目标tile语义；保护矩阵状态 | 非法形状、把INT8外推其他dtype/dot_scaled |
+| S9-03 | 按能力ID独立扩展类型与算子 | 复用已有方言，新增语义单独定义 | 分别验收AOT/JIT，登记已通过模式 | 未验证能力不进入支持承诺 |
 
 ## 分阶段任务明细
 
@@ -532,9 +583,9 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S0-01 | 确认固定工具链与构建 | 确认现有 backend 注册（含 `python/triton/backends/coral` 软链接或 `entry_points` 与 `TRITON_DEFAULT_BACKEND=coral`）、Coral SDK、LLVM/MLIR 头库及 RISC-V target。只检查当前闭环所需依赖。 | 无 | 可复现的版本和构建记录 | LLVM 版本与补丁一致，现有插件可导入且不误回退到 NVIDIA 驱动；此项不要求 TTS 编译成功。 |
-| S0-02 | 约定最小参数与地址接口 | 首版确定 RV32/ILP32、小端、v2 参数块（`0x00010000`、`bindings[3]`/`scalars[4]`、`done` 为完成标志地址）各字段 offset/width/alignment、16B 栈对齐和区域边界。只实现 core0 所需最小接口，逻辑 ID 与物理核分开。 | S0-01 | 一页最小 ABI 及地址说明 | 编译器、入口和控制固件共享明确字节布局；明确 v2 槽位上限与版本扩展方式，不从宿主 void* 或结构体大小推断设备 ABI，版本或越界不匹配应拒绝。 |
-| S0-03 | 建立首批源程序与诊断入口 | 补齐 `CoralOptions` 前端必读字段（如 `sanitize_overflow=False`），保存单元素标量 INT32 拷贝/加一（不含 `tl.arange`/tensor block）的真实前端 TTIR、支持操作和类型白名单、阶段 IR、错误及数值参考。 | S0-02 | 可重复的源程序与构建入口 | 源码实际产生预期标量 TTIR；未知操作、类型和配置给出阶段及源位置，与 S2 block 语义边界清晰；不以改名或 payload 存在验收。 |
+| S0-01 | 确认固定工具链与构建 | 固定 Triton commit、Coral SDK/LLVM 补丁、MLIR 头库和 RISC-V target；确认后端发现、软链接/entry_points 与 TRITON_DEFAULT_BACKEND=coral。记录实际浮点/BF16/RVV/Zvt 配置，只启用当前闭环能力。 | 无 | 可复现的版本和构建记录 | 版本、补丁、目标配置及插件发现可复现，不误回退到 NVIDIA；浮点/BF16 配置不算对应 kernel 已通过；不要求 TTS 编译成功。 |
+| S0-02 | 约定最小参数与地址接口 | 首版确定 RV32/ILP32、小端、v2 参数块（0x00010000、bindings[3]/scalars[4]、done 为完成标志地址）各字段 offset/width/alignment、16B 栈对齐和区域边界。只实现 core0 所需最小接口，逻辑 ID 与物理核分开。 | S0-01 | 一页最小 ABI 及地址说明 | 编译器、入口和控制固件共享明确字节布局；明确 v2 槽位上限与版本扩展方式，不从宿主 void* 或结构体大小推断设备 ABI，版本或越界不匹配应拒绝。 |
+| S0-03 | 建立首批源程序与诊断入口 | 固化 scalar_copy/scalar_add 和 empty_kernel 的真实源 TTIR、支持白名单与诊断。用 check_plan.py 校验计划、教程和用例清单；区分框架自检、前端、LLVM 方言、真实执行证据。 | S0-02 | 可重复的源程序与构建入口 | 前端源码及目标错误诊断通过，空函数可独立生成 TTIR；协议2请求/产物可追踪，计划与测试一致。不以占位 payload 或编译检查代替执行。 |
 
 建议代码位置：
 
@@ -550,9 +601,9 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S1-01 | 实现最小 TTIR 到 LLVM 转换 | 分三微步推进：S1-01a 空函数与 `!tt.ptr<i32>`；S1-01b 标量 `i32` `tt.load`/`tt.store`；S1-01c `arith`/`cf` 整数算术与显式 RV32 triple/32 位指针 data layout。直接用 LLVM Dialect 并接入 `triton-opt`；不经过 TTS/Linalg。 | S0-03 | 由真实 TTIR 生成的 LLVM IR | LLVM verifier 通过，可由 `triton-opt` 做 lit 回归；改变源码会改变计算。INT32 加法按 32 位模运算验证，不能无依据添加 nsw/nuw；最小例在 O0/O2 下与无 UB 参考一致。 |
-| S1-02 | 实现 kernel 入口包装 | 入口按 v2 参数框架（`a0=0x00010000`）校验 `abi`/`size`、设置 16B 对齐栈（`sp=0x00018000`）、读取设备参数、调用生成函数，并在返回前执行 `fence rw,rw` 后向 `args->done` 指向地址写 1。控制 CPU 与 Coral kernel 的 ISA 配置分开。 | S1-01,S0-02 | 可裸机执行的入口与参数绑定 | 参数、栈、完成标志和 DTCM 预留区不重叠；非法配置不启动，共享写结果对控制 CPU 可见后再发布完成标志。 |
-| S1-03 | 生成真实静态 RISC-V ELF | 首版明确调用固定 SDK 的 clang/ld.lld 编译 LLVM IR 并链接入口和脚本（保留 `.text` 末 256B `FILL(0x13000000)` 预取 NOP 填充及 `0x00010100`/`0x6f00` DATA 布局）。记录 target、ABI、features 和未解析符号。 | S1-02 | ELF、符号/段信息及最小元数据 | ELF32/小端/RISC-V、ISA 属性、ABI、入口、NOP 预取填充和 PT_LOAD 正确；初期静态链接，未解析 helper、动态重定位或未支持指令必须诊断。 |
+| S1-01 | 实现最小 TTIR 到 LLVM 转换 | 按 S1-01a 空函数/指针签名、S1-01b 标量 i32 load/store、S1-01c 常量/addi 三微步实现并注册 triton-opt pass。空函数用 S1.empty.frontend/S1.empty.llvm 单独验收；内部控制流使用标准转换，源级动态分支留 S4。 | S0-03 | 由真实 TTIR 生成的 LLVM IR | 空函数 LLVM 方言 checkpoint/verifier 与标量 LLVM IR 均合法；G1 源白名单仅拷贝、常量加法和回绕。O0/O2 与无 UB 参考一致，不擅加 nsw/nuw；更多算术逐项加测试。 |
+| S1-02 | 实现 kernel 入口包装 | 入口按 v2 参数框架（a0=0x00010000）校验 abi/size、设置 16B 对齐栈（sp=0x00018000）、读取设备参数、调用生成函数，并在返回前执行 fence rw,rw 后向 args->done 指向地址写 1。控制 CPU 与 Coral kernel 的 ISA 配置分开。 | S1-01,S0-02 | 可裸机执行的入口与参数绑定 | 参数、栈、完成标志和 DTCM 预留区不重叠；非法配置不启动，共享写结果对控制 CPU 可见后再发布完成标志。 |
+| S1-03 | 生成真实静态 RISC-V ELF | 首版明确调用固定 SDK 的 clang/ld.lld 编译 LLVM IR 并链接入口和脚本（保留 .text 末 256B FILL(0x13000000) 预取 NOP 填充及 0x00010100/0x6f00 DATA 布局）。记录 target、ABI、features 和未解析符号。 | S1-02 | ELF、符号/段信息及最小元数据 | ELF32/小端/RISC-V、ISA 属性、ABI、入口、NOP 预取填充和 PT_LOAD 正确；初期静态链接，未解析 helper、动态重定位或未支持指令必须诊断。 |
 | S1-04 | 建立 AOT 镜像打包 | 宿主按加载段打包，显式约定 p_vaddr/p_paddr 的使用；检查文件范围、filesz<=memsz、地址加法溢出、段权限、对齐、重叠和 BSS 零填充。 | S1-03 | 来源可追踪的启动镜像与 manifest | 损坏/截断 ELF、越界或重叠加载段、区域不匹配及入口不在合法代码区均被拒绝；保存 ELF 与加载段哈希。 |
 | S1-05 | 接通真实 core0 执行 | 控制 CPU 装载、初始化参数/完成状态并启动 core0。定义每次提交的序号和完成匹配；依据实际核能力确认代码装载后的取指可见性。 | S1-04 | 真实 AOT 执行入口 | 连续运行不同代码和输入正确；旧完成标志不能使新调用提前结束，trap/超时有诊断，未确认停止的核不能被直接复用。 |
 | S1-06 | 验收第一个端到端 | 运行 S1 拷贝、不同 constexpr、INT32 回绕及同会话换代码用例；非法 ABI 在启动前拒绝。对每个结果检查独立参考、保护区和真实执行证据。 | S1-05 | G1 单核闭环报告 | S1 全部用例通过；TTIR、LLVM、真实 ELF、加载镜像、配置和输出可追踪；旧完成或旧代码不能使新调用误通过。 |
@@ -574,7 +625,7 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S2-01 | 支持 block 与基本张量操作 | 将有限 block 子集正确降低为 `scf.for` 标量循环（并控制 LLVM 循环展开因子以防 8 KiB ITCM 溢出），保持 tensor SSA 的加载、计算、写回顺序；仅在证明无依赖时融合循环，不按元素交错执行改变别名语义。 | S1-06 | 基本 block 语义 | 先支持不相交 buffer 和已验证的原地计算并满足 ITCM 8 KiB 约束；部分重叠访问须保持源语义或明确诊断，不能把标量循环结果错误归因于 Triton。 |
+| S2-01 | 支持 block 与基本张量操作 | 将有限 block 子集正确降低为 scf.for 标量循环（并控制 LLVM 循环展开因子以防 8 KiB ITCM 溢出），保持 tensor SSA 的加载、计算、写回顺序；仅在证明无依赖时融合循环，不按元素交错执行改变别名语义。 | S1-06 | 基本 block 语义 | 先支持不相交 buffer 和已验证的原地计算并满足 ITCM 8 KiB 约束；部分重叠访问须保持源语义或明确诊断，不能把标量循环结果错误归因于 Triton。 |
 | S2-02 | 实现真正受保护的 masked 访存 | mask 控制实际 load/store，保留 other 和尾部语义。对无法支持的访问明确拒绝，不扩大访存范围。 | S2-01 | mask 与边界转换 | 全假 mask 不访存，other 显式给值时精确保持；未给 other 的无定义 lane 不能擅自当零或参与有效输出，尾部和保护区受检。 |
 | S2-03 | 支持逻辑 program 与顺序 grid | 将 program_id/num_programs 读取到 ABI，先支持 1D grid，由 core0 顺序执行多个 program。一个 program 先由一个核完整执行，逻辑 tensor 在核内分段处理。 | S2-02 | 多 program 单核启动 | grid 大于物理核数仍正确；核号不替代逻辑 ID，参数更新与前次执行完成有序。后续多核复用此映射，不以物理 VLEN 限制逻辑 BLOCK。 |
 | S2-04 | 验收基本 Triton 程序 | 运行 S2 的长度 0/1/3/37/128/1000、BLOCK=16/64、constexpr 分支、原地、显式 other 与非法 BLOCK 用例；按实际共享区容量分配。 | S2-03 | G2 语义回归报告 | S0～S2 累计回归通过；全假 mask 不访问输入输出，other 保持定义，尾部和原地正确；BLOCK=3 明确诊断。N=0 的 grid=1 与 S3 零 grid 分开。 |
@@ -588,16 +639,16 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 ## S3 JIT 与特化调用
 
-出口：**G3**。kernel[grid](...)、运行参数、constexpr 缓存和重复调用获得真实结果。
+出口：**G3**。标准 JIT/缓存和设备 buffer 正确；v3 六运行参数 AOT/JIT 通过，v2 超容量明确拒绝。
 
 本阶段范围：零 grid 可以不编译/不启动；完整 Torch 设备适配不在首版范围。
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S3-01 | 实现真实 driver 和 launcher 接口 | 按本地 CompiledKernel 实际调用链补齐启动、设备/串行 stream 及装载接口。明确激活 Coral，移除无条件激活和伪零计时。 | S2-04 | 能够执行的 driver | 明确首次调用、重复调用及零 grid 的行为；启动路径不依赖 CUDA。冷启动计时和 kernel 设备周期分别报告，未计入完成等待的时间不作执行耗时。 |
-| S3-02 | 提供设备 buffer 与显式拷贝 | 提供设备分配、合法范围、region/owner、参数打包和结果取回；初期以共享 SRAM 为主，不要求完整 Torch 设备适配。超过 v2 槽位（`bindings[3]`/`scalars[4]`）的通用参数明确报错或升级 ABI v3 扩展帧。 | S3-01 | 设备 buffer 接口与参数布局 | buffer 的范围、别名 view、生命周期、参数槽位上限和 owner 明确；执行中的参数/输出在确认完成或恢复前不能释放复用，禁止宿主指针或失效 buffer 启动。 |
+| S3-01 | 实现真实 driver 和 launcher 接口 | 按本地 CompiledKernel 实际调用链补齐启动、设备/串行 stream 及装载接口。明确激活 Coral，移除无条件激活和伪零计时。 | S2-04 | 能够执行的 driver | 通过 jit_entry.launch 调用实际 `kernel[grid](...)`，Coral driver 选择及返回 CompiledKernel 的 ELF 与执行 ELF 哈希相符。AOT 不能冒充 JIT；零 grid 不启动，计时包含完成等待并分清冷启动。 |
+| S3-02 | 提供设备 buffer 与显式拷贝 | 实现设备 buffer/别名 view 与显式拷贝；保留 v2（68B、3 binding/4 scalar），必须实现 v3（128B、8 binding/12 个32位 scalar）及编译器 wrapper/控制固件一致解析。v3 六参数正例和 v2 超槽位负例属于 G3，不依赖 DMA/多核。 | S3-01 | 设备 buffer 接口与参数布局 | S3.abi-v3 的 AOT/JIT 六运行参数均正确，v2 容量错误在启动前拒绝；头/size/count/空槽/地址/32位溢出校验通过。资源确认完成或恢复前不释放复用，宿主/失效指针不能启动。 |
 | S3-03 | 接通 JIT 调用与缓存 | 支持 `kernel[grid](...)` 的常量/运行参数。复用已有 AOT 仿真桥也可形成首版 JIT；缓存绑定 LLVM、补丁、ABI、代码生成及目标配置。 | S3-02 | 可调用的 JIT 及正确缓存 | 相同配置可命中，配置变化能失效；源码和输入变化产生正确结果。冷启动开销如实记录。 |
-| S3-04 | 验收标准 JIT 闭环 | 运行 S3.cache 的同会话三次调用：同常量换输入命中缓存，换 DELTA 重新特化；另测零 grid、失效 buffer、错误与真实计时。 | S3-03 | G3 JIT 验收报告 | S0～S3 累计通过；真实 JIT 与 AOT 一致，cache key/hit 可解释，零 grid 不启动，失效对象不发任务。 |
+| S3-04 | 验收标准 JIT 闭环 | 运行 S3.cache 的同会话三次调用：同常量换输入命中缓存，换 DELTA 重新特化；另测零 grid、失效 buffer、错误与真实计时。 | S3-03 | G3 JIT 验收报告 | S0～S3 累计通过，S1/S2 正例有实际 JIT 镜像用例；标准调用记录、ELF、cache key/hit 与运行结果对应。v3 六参数通过，零 grid 不启动，失效对象不发任务。 |
 
 建议代码位置：
 
@@ -617,9 +668,9 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 | S4-01 | 为二维与循环语法接入 Ascend TTS | 先读取 strided_bias/loop_sum 的真实 TTIR，再固定 Ascend TTS 来源并试验最小指针分析/结构状态移植。适配 LLVM 24、接口和授权；以这些源程序定义移植边界。 | S3-04 | 可构建的 Ascend TTS 子集 | parse/print/verifier 和最小 pass 通过；二维/循环源程序能进入所选分析路径，不能仅用手写不可达 IR 宣布 TTS 接入完成。 |
 | S4-02 | 实现规则指针结构分析 | 围绕 strided_bias 支持二维 rows[:,None]/cols[None,:]、SX/SY stride、行内广播和尾部 mask。保留全局 buffer 身份，未知布局 fallback 或诊断。 | S4-01 | 结构化访问结果 | 5×7 数据在 SX=11/SY=9 布局上结果正确，padding 不改写；源 TTIR 到结构化访问的索引映射可检查。 |
 | S4-03 | 处理循环携带结构状态 | 围绕 loop_sum 和 scalar_while 实现运行时 for/while/标量 if、循环携带指针及合流。按需要使用 Ascend get_structured_state 与 SCF，区分 index 和固定宽度整数。 | S4-02 | 可验证的循环地址转换 | R=0/1/3、FLAG=0/1 均正确；循环前后和回边地址状态一致，没有静默截断；最终 TTS 占位状态消除。 |
-| S4-04 | 接入 Linalg/Tensor 计算 | 将二维逐元素、广播、选择和循环中的计算映射到 Linalg/Tensor/SCF，保持真实访存 mask；以可观察的新语法用例验收。tl.sum/tl.max 在 S5 扩展，矩阵在 S8。 | S4-03 | 结构化计算 IR | strided_bias 的结构化计算含 Linalg，索引图/形状/初值/signedness 正确；循环控制用 SCF，不强制把 while 包装成 Linalg。 |
+| S4-04 | 接入 Linalg/Tensor 计算 | 把二维逐元素、广播、选择和循环计算映射到 Linalg/Tensor/SCF，保持 mask 和有效索引。S4 不新增 tl.sum；tl.sum/tl.max 明确由 S5 引入，矩阵由 S8 引入。 | S4-03 | 结构化计算 IR | strided_bias 的结构化计算与索引/初值/signedness 正确，for/while/标量 if 使用 SCF。S4 新语法在 AOT 和标准 JIT 两种模式均通过。 |
 | S4-05 | 完成优化、Bufferization 与 LLVM 降低 | 先做必要 tensor 变换，再 Bufferization 或使用已选 buffer 语义路径。处理 alias、容量、生命周期、index/data layout 和合法性。 | S4-04 | 可生成 ELF 的结构化流水线 | 无错误复用和容量越界，接口模型齐全，最终没有无法导出 LLVM 的 tt/tts/linalg 残留。 |
-| S4-06 | 迁移并统一主流水线 | 以 S4 新增二维/循环源程序和 S0～S3 既有用例统一结构化主线。迁移期做新旧差分，覆盖一致后停止扩张旧标量路径并移除冗余。 | S4-05 | G4 结构化主线报告 | S4 新语法和 S0～S3 累计 AOT/JIT 回归通过，Bufferization/最终合法性检查通过；不能仅以方言注册或 IR 文本存在验收。 |
+| S4-06 | 迁移并统一主流水线 | 以 S4 新增二维/循环源程序和 S0～S3 既有用例统一结构化主线。迁移期做新旧差分，覆盖一致后停止扩张旧标量路径并移除冗余。 | S4-05 | G4 结构化主线报告 | S4 新语法及 S0～S3 累计 AOT/JIT 回归通过；Bufferization 与最终合法性检查通过。新增语法不能只用 AOT 验收；停止扩张旧路径并收敛主线。 |
 
 建议代码位置：
 
@@ -638,9 +689,9 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S5-01 | 实现目标宽度向量化 | 在结构化主线对 Linalg/Vector 做 strip mining 和合法化，并在入口开启 `mstatus.VS`（`0x600`）。BLOCK 与目标 VLEN 分开，处理 VL、mask、对齐与尾部，同时限制循环展开防 8 KiB ITCM 溢出。 | S4-06 | 真实 RVV kernel | 反汇编存在 RVV 运算及所需配置指令；大 BLOCK 仍正确，不能仅靠 LLVM IR 中的 vector 类型验收。 |
-| S5-02 | 实现核内整数向量归约 | 支持已声明的整数 sum 等归约及必要重排；保留初值、扩展、尾部和溢出约定。浮点模式另行验收。 | S5-01,S4-04 | 核内归约实现 | 多个长度与独立参考一致，源程序不含隐式跨核协作或非法 lane-varying 标量。 |
-| S5-03 | 验收单核 RVV 主线 | 比较标量参考与 RVV 结果，记录实际指令、资源、数值、AOT/JIT 和错误回归。 | S5-02 | G5 RVV 报告 | 正确性、指令和资源检查通过；当前 VLEN=128 为目标配置实例，不能宣称任意 VLEN 已执行验证。 |
+| S5-01 | 实现目标宽度向量化 | 在结构化主线对 Linalg/Vector 做 strip mining 和合法化，并在入口开启 mstatus.VS（0x600）。BLOCK 与目标 VLEN 分开，处理 VL、mask、对齐与尾部，同时限制循环展开防 8 KiB ITCM 溢出。 | S4-06 | 真实 RVV kernel | 反汇编存在 RVV 运算及所需配置指令；大 BLOCK 仍正确，不能仅靠 LLVM IR 中的 vector 类型验收。 |
+| S5-02 | 实现核内整数向量归约 | 按 reduce_sum/reduce_max 支持 tl.sum/tl.max 的整数归约、初值、扩展、signedness、尾部和重排；逻辑 BLOCK 分段到 RVV，浮点模式独立。 | S5-01,S4-04 | 核内归约实现 | 长度1/3/37/1000 的 AOT/JIT 与独立参考一致，并有真实 RVV 反汇编和绑定 launch 的指令轨迹；不引入隐式跨核协作或非法 lane-varying 标量。 |
+| S5-03 | 验收单核 RVV 主线 | 比较标量参考与 RVV 结果，记录实际指令、资源、数值、AOT/JIT 和错误回归。 | S5-02 | G5 RVV 报告 | S0～S5 累计 AOT/JIT、BLOCK>VLEN、尾部、数值、指令及资源检查通过；VLEN=128 仅为当前配置。G5 后可独立推进 S9-03，已验收类型按能力/模式清单进入累计回归。 |
 
 建议代码位置：
 
@@ -677,8 +728,8 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
 | S7-01 | 实现 coral_mem 与区域资源模型 | 落实 HBF、DRAM、共享 SRAM、各核 DTCM/ITCM 的 owner、容量、权限、对齐和可达路径。新增真正需要的存储/view/copy 语义。 | S6-04 | 显式分层 buffer 与搬运契约 | 拒绝 HBF 写、非法 owner、容量超限和不存在的路径。32 位映射窗口与物理容量、设备指针宽度分别记录；超窗口显式分块或诊断，禁止静默截断。 |
-| S7-02 | 生成 tile 访问范围与局部布局 | 分析连续范围、stride、mask、对齐、alias 和生命周期，分配局部副本并改写 tile 内索引，保留全局 tensor 身份。 | S7-01,S4-02 | 静态内存和访问计划 | 参数、栈、scratch、数据容量不重叠；局部指针不重复加 program 偏移。全局 tensor 与局部副本保持别名身份，写回、失效和跨核消费者依赖明确。 |
-| S7-03 | 降低 DMA、依赖与完成可见性 | 按实际 DMA 的 4B 对齐、不重叠、单通道和单 beat 约束生成 NC_COPY/NC_KERNEL 及事件。必要的多前驱依赖显式合并。 | S7-02,S6-03 | 可执行的搬运与计算计划 | 完成意味着目标消费者可见，明确 CPU/RVV/DMA 的排序边界；依赖不能模拟原子读改写。失败记录已完成字节和错误任务，部分输出不回滚；重试须证明幂等或重新初始化。 |
+| S7-02 | 生成 tile 访问范围与局部布局 | 分析连续范围、stride、mask、对齐、alias 和生命周期，分配局部副本并改写 tile 内索引，保留全局 tensor 身份。 | S7-01,S4-02 | 静态内存和访问计划 | 参数/栈/scratch/数据不重叠；保留全局别名身份与局部 owner。逻辑访存按 program、读写方向、mask/stride 校验，padding 不得被逻辑读写；物理 DMA padding 搬运单独证明合法。 |
+| S7-03 | 降低 DMA、依赖与完成可见性 | 按实际4B对齐、单通道、同核互斥约束降低 DMA。协议2用 view/分配generation/数据version/生产者关联 copy 和 kernel，end 定义为消费者可见完成；异常记录部分输出并传播失败。 | S7-02,S6-03 | 可执行的搬运与计算计划 | 拒绝输入copy晚于消费、回写早于计算、无生产者版本、陈旧副本、未结束消费者上的复用、错误owner和单通道超发；回写必须到真实输出区。失败不回滚，重试须证明幂等或重新初始化。 |
 | S7-04 | 先验证一核多层搬运 | 先执行 HBF 到 DRAM 再到核内 DTCM、计算、DRAM 回写的显式单缓冲路径。共享 SRAM 仅按需要参与，其他路径以后按能力选择。 | S7-03 | 一核多层存储报告 | HBF 零写入，DRAM 只存储；staging、局部计算及回写逐项正确，容量/边界/权限错误可诊断。 |
 | S7-05 | 再验证多核多层搬运 | 复用 block_add 执行 S7 的单/多核分层路径；注入 HBF 写、owner 错误与部分 DMA 失败，检查停止、恢复、句柄失效和重新启动。 | S7-04,S6-04 | G7 分层存储报告 | S7 正例、负例和累计回归通过；部分输出不回滚，停止前不复用资源，恢复证据含旧句柄失效及重启成功。错误码为测试协议，需在适配器中映射真实诊断。 |
 
@@ -698,9 +749,9 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S8-01 | 接入合法 dot 与矩阵语义 | 先在 CoralBackend.get_codegen_implementation 提供与真实支持类型相符的 min_dot_size，并明确 CoralOptions 的精度字段；再让 INT8 16×16×32 的合法 dot 源进入矩阵 lowering，拆分硬件 K 子块。 | S5-03,S4-04 | 前端可达的矩阵 IR | 无需教程提议回调也能生成合法 dot TTIR，未支持类型/形状有诊断；前端 tile 与 16×16×4 硬件子块分开，dot_scaled 和其他 dtype 不外推。 |
+| S8-01 | 接入合法 dot 与矩阵语义 | 以 G3 已完成的 ABI v3 承载 M/N/K/SA/SB/SC 六个运行参数。补齐真实 min_dot_size 与精度选项，再将 INT8 16×16×32 源转换到矩阵/tile；硬件 K 子块与前端形状分开。 | S5-03,S4-04 | 前端可达的矩阵 IR | 无需教程提议回调即可生成合法 dot TTIR；AOT/JIT 均使用 v3，S8.reject-v2 在启动前拒绝。未支持类型/形状有诊断，不外推 dot_scaled 或其他 dtype。 |
 | S8-02 | 实现 coral tile 计算方言 | 此时引入 coral.tile_mma 等确有目标语义的操作。首版可在 buffer 阶段匹配合法 tile；若前移到 tensor 阶段则补齐所需接口模型。 | S8-01 | 有 verifier 的 tile 操作 | 形状、布局、输入与累加类型、tile 状态及内存效果明确，不重复定义普通算术。 |
-| S8-03 | 降低到已验证 Zvt 接口 | 核对固定 SDK 的真实 intrinsic 或微内核接口，处理装载、tile 状态、累加与输出。微内核调用路径与内联 lowering 分别记录。 | S8-02 | 真实 Zvt 目标代码 | 实际指令/派发证据匹配，副作用不会被优化器错误删除或重排。 |
+| S8-03 | 降低到已验证 Zvt 接口 | 核对固定 SDK/RTL 的 intrinsic/微内核与 mstatus 矩阵使能（当前接口记录0x60000000），处理装载、tile状态、累加和输出；保护 Zvt 状态活跃区间，避免 vsetvli 重置 mtype/altfmt。微内核与内联路径分别记录。 | S8-02 | 真实 Zvt 目标代码 | 实际指令与所属 launch 的轨迹对应；状态/副作用不被优化器删除、重排或被 vsetvli 重置。使能位和状态行为以固定 SDK/RTL 验证，不能套用其他版本 ISA。 |
 | S8-04 | 验收矩阵执行 | 运行 S8 的 16×16×32 与 17×19×35、padding/尾部/1及4核矩阵用例。先 M/N 分块，跨核 K 归约以后另设计。 | S8-03,S7-05 | G8 Zvt 报告 | S8 数值、宽位参考、pack/transpose、实际 Zvt 指令和执行轨迹通过；padding 不改写，布局开销计入；INT8 不代表其他类型通过。 |
 
 建议代码位置：
@@ -720,7 +771,7 @@ HBF 是 High Bandwidth Flash，计算平面只读；3D DRAM 承担存储。多�
 | --- | --- | --- | --- | --- | --- |
 | S9-01 | 建立可解释的性能基线 | 分别记录编译、启动、kernel、DMA、争用及控制周期和宿主仿真耗时。关联目标配置、源码、固件和二进制。 | S7-05 | 分项性能基线 | 报告编译、打包、仿真启动、装载、kernel 与回传的边界，按真实时间基准比较；模型周期和宿主耗时分开，不以虚构或未归一化计时宣称吞吐。 |
 | S9-02 | 逐步实现重叠和双缓冲 | 先重叠不同核的搬运/计算；只有端口、buffer 不相交和生命周期有证明时，才放宽同核互斥或增加预取/双缓冲。 | S9-01 | 有证据的流水线优化 | 不覆盖仍在消费的 buffer，不超发 DMA；每次优化同时给出正确性和周期证据。 |
-| S9-03 | 按需求扩展算子与类型 | G5 后按需求独立扩展类型/语法，先用 S9.fp32 与 S9.bf16 测有限加法和 BF16 读取扩宽，再补特殊值/舍入/数学函数、scan/sort、非规则访存、融合/卷积、原子及 descriptor。每项单独建用例。 | S5-03 | 逐项语法/类型支持报告（独立于性能出口） | 类型扩展不等待双缓冲、多核或 Zvt；有限浮点样例只证明对应操作，BF16 扩宽不代表 BF16 算术。每项分别验收类型/布局/精度、转换、代码、数值及错误，禁止宿主代算替代。 |
+| S9-03 | 按需求扩展算子与类型 | G5 后按需求独立扩展类型/语法，先用 S9.fp32 与 S9.bf16 测有限加法和 BF16 读取扩宽，再补特殊值/舍入/数学函数、scan/sort、非规则访存、融合/卷积、原子及 descriptor。每项单独建用例。 | S5-03 | 逐项语法/类型支持报告（独立于性能出口） | 每个语法/类型能力分别按AOT/JIT、目标配置和精度验收，记录 validated_capabilities；通过的可选模式自动进入后续累计回归，未验证模式保持排除。有限样例不外推完整浮点/数学/原子能力，禁止宿主代算。 |
 
 建议代码位置：
 

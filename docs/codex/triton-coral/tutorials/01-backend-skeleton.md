@@ -4,6 +4,8 @@
 
 配套文件：[实施计划](../plan.md)、[任务数据](../plan.json)、[任务表](../tasks.xlsx)、[总目录](../../README.md)。
 
+本篇是提交 `4f045a9d77` 的骨架复盘，不能作为后续能力的验收清单。下一步按 [起步微步](../backend-skeleton.md) 推进；当前阶段白名单、必需 ABI v3 与测试协议2统一维护在 `plan.json`/`plan.md`。空函数已有 `S1.empty.frontend` 和 `S1.empty.llvm` 独立用例，新增语法须分别验证 AOT/JIT。
+
 ---
 
 ## 1. 本篇目标与验证边界

@@ -4,6 +4,8 @@
 
 配套文件：[实施计划](plan.md)、[任务数据](plan.json)、[任务表](tasks.xlsx)、[目录与维护说明](../README.md)。
 
+本文保留骨架复盘与起步微步；阶段白名单、ABI和验收以 `plan.json` 及同步的 `plan.md` 为准。当前测试协议为2：主机自检、前端、LLVM方言检查和设备执行分别记录，不能用骨架占位产物验收执行。
+
 ---
 
 ## 0. 你现在在哪里 & 下一步做什么（总览）
@@ -14,7 +16,7 @@
 | --- | --- | --- | --- | --- | --- |
 | **第一段：后端骨架** | Step 1～Step 8 | 接入 `third_party/coral` 注册骨架、nanobind 扩展、Driver 与 3 段式 `add_stages` 壳子 | 单元素 `tl.load(ptr)` / `tl.store(ptr, x)`（仅到 TTIR + 占位 ELF） | **不新增方言**，仅用 Triton 原生 `tt` | **已完成（`4f045a9d77`）** |
 | **第二段：S0-03（下一步第 1 小步）** | **Micro-Step 1** | 补全 `CoralOptions`（`sanitize_overflow=False` 等）+ 固化标量拷贝与加一用例 | 新增单元素标量 `x + 1`（`*i32` 指针，无 `tl.arange`） | **不新增方言**，仅用原生 `tt` + `arith` | **⬅ 紧接着先做这一步** |
-| **第二段：S1-01a（下一步第 2 小步）** | **Micro-Step 2** | 搭 `MinimalTritonToLLVM` Pass 架子，只转空函数与指针参数 | `@triton.jit def f(p: *i32): return` | **不新增自定义方言**，复用标准 `LLVM` 方言 | 待开始 |
+| **第二段：S1-01a（下一步第 2 小步）** | **Micro-Step 2** | 搭 `MinimalTritonToLLVM` Pass 架子，只转空函数与指针参数 | `empty_kernel(X, Y)`；指针类型在 `ASTSource.signature` 中声明 | **不新增自定义方言**，复用标准 `LLVM` 方言 | 待开始 |
 | **第二段：S1-01b（下一步第 3 小步）** | **Micro-Step 3** | 在 Pass 中加入标量 `i32` 无掩码访存转换 | `x = tl.load(in_ptr); tl.store(out_ptr, x)` | **不新增自定义方言**，复用标准 `LLVM` 方言 | 待开始 |
 | **第二段：S1-01c（下一步第 4 小步）** | **Micro-Step 4** | 接入标准 `ArithToLLVM` + RV32 Triple/DataLayout + LLVM Verifier | `x + 1` 等标量 `i32` 算术，拒绝 `tl.arange` | **不新增自定义方言**，复用标准 `arith`/`cf`/`LLVM` | 待开始 |
 
@@ -371,11 +373,26 @@ module {
   3. `third_party/coral/CMakeLists.txt`（加 `add_subdirectory(include)`、`add_subdirectory(lib)` 与 `LINK_LIBS CoralMinimalTritonToLLVM`）
   4. `bin/RegisterTritonDialects.h`（注册 `registerCoralMinimalTritonToLLVMPasses()`）
 - **本小步验收标准**：
-  用固定构建脚本编译出 `triton-opt`，对仅含 `tt.func` + `tt.return` 的 `.mlir` 运行：
-  ```bash
-  triton-opt --convert-coral-minimal-triton-to-llvm empty.ttir.mlir
+  使用已有真实源码 [empty_kernel](examples/kernels.py)，不把 `p: *i32` 当成 Python 类型注解：
+
+  ```python
+  @triton.jit
+  def empty_kernel(X, Y):
+      pass
+  # ASTSource.signature = {"X": "*i32", "Y": "*i32"}
   ```
-  输出合法的 `llvm.func @empty(%arg0: !llvm.ptr, %arg1: !llvm.ptr) { llvm.return }`。
+
+  沿用 plan.md 中的 `CORAL_PYTHON`、`CORAL_TUTORIAL`、`CORAL_TEST_OUT` 环境变量，先生成并验证源 TTIR：
+
+  ```bash
+  "$CORAL_PYTHON" "$CORAL_TUTORIAL/dump_ttir.py" --stage S1 --case S1.empty.frontend --output "$CORAL_TEST_OUT/empty"
+  ```
+
+  完成并注册本微步的 pass、构建 `triton-opt` 后，对上一步生成的文件运行：
+  ```bash
+  triton-opt --convert-coral-minimal-triton-to-llvm "$CORAL_TEST_OUT/empty/S1.empty.frontend.0.ttir"
+  ```
+  输出应有 `llvm.func @empty_kernel(%arg0: !llvm.ptr, %arg1: !llvm.ptr) { llvm.return }`，并通过实际 MLIR verifier。接通真实 pass 适配器后，运行 `run_stage.py --stage S1 --case S1.empty.llvm --adapter "$CORAL_ADAPTER" --output "$CORAL_TEST_OUT/empty-lowered"`，mode=ir 只要求真实 TTIR、LLVM方言 checkpoint 和 verifier，不要求 load/store、ELF 或启动设备。该微步不计作 G1 执行通过。
 
 ---
 

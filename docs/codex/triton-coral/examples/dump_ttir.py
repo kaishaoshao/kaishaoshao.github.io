@@ -57,12 +57,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--stage", choices=[f"S{i}" for i in range(10)], required=True)
     parser.add_argument("--cumulative", action="store_true")
+    parser.add_argument("--case", action="append", default=[], help="one exact case ID; repeat to select several")
     parser.add_argument("--tutorial-dot-contract", action="store_true",
                         help="proposed INT8 16x16x32 frontend bound, not implemented backend/hardware support")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     selected = [c for c in cases() if (int(c["stage"][1:]) <= int(args.stage[1:]) if args.cumulative
-                                     else c["stage"] == args.stage)]
+                                     else c["stage"] == args.stage) and (not args.case or c["id"] in args.case)]
+    if not selected or not set(args.case) <= {c["id"] for c in selected}:
+        parser.error("case ID is unknown or outside the selected stage")
     args.output.mkdir(parents=True, exist_ok=True)
     seen, inventory = set(), []
     for case in selected:

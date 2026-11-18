@@ -1,4 +1,13 @@
 // Use one prefix against the matching frontend sample/checkpoint, not all prefixes at once.
+// EMPTY: tt.func public @empty_kernel
+// EMPTY-NOT: tt.load
+// EMPTY-NOT: tt.store
+// EMPTY: tt.return
+
+// EMPTYLLVM: llvm.func @empty_kernel
+// EMPTYLLVM-NOT: tt.func
+// EMPTYLLVM: llvm.return
+
 // SCALAR: tt.func public @scalar_add
 // SCALAR: tt.load
 // SCALAR: arith.addi

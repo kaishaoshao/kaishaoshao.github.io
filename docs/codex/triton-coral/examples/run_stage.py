@@ -3,16 +3,18 @@
 import argparse
 import copy
 import hashlib
-import itertools
 import json
 import math
 from pathlib import Path
+import re
 import struct
 import subprocess
 import sys
 import uuid
 
 from suite import cases
+from access import select_cases
+from trace_contract import check_trace
 
 HERE = Path(__file__).resolve().parent
 
@@ -25,7 +27,8 @@ def request_for(case, nonce=None):
     request = copy.deepcopy(case)
     for item in request["steps"]:
         item["output_bindings"] = list(item.pop("expected"))
-    request.update(protocol=1, nonce=nonce or uuid.uuid4().hex, pipeline="current-mainline",
+    request.setdefault("abi_version", 2)
+    request.update(protocol=2, nonce=nonce or uuid.uuid4().hex, pipeline="current-mainline",
                    kernel_source_sha256=digest((HERE / "kernels.py").read_bytes()))
     encoded = json.dumps(request, sort_keys=True, allow_nan=False).encode()
     request["request_sha256"] = digest(encoded)
@@ -84,53 +87,8 @@ def check_values(actual, expected, tolerance=None):
             require(equal, f"{binding}[{index}]: {got!r} != {want!r}")
 
 
-def check_trace(trace, step, case):
-    events = trace["events"]
-    require(not any(e["kind"] in ("bounds_violation", "trap") for e in events), "invalid access or trap")
-    guards = [e for e in events if e["kind"] == "guard_check"]
-    require(bool(guards) and all(e.get("ok") is True for e in guards), "missing/failed guard checks")
-    accesses = [e for e in events if e["kind"] == "access"]
-    for access in accesses:
-        binding = access["binding"]
-        require(binding in step["buffers"], "unknown tensor access binding")
-        index, count = access["index"], access["count"]
-        require(type(index) is int and type(count) is int and index >= 0 and count > 0 and
-                index + count <= len(step["buffers"][binding]["values"]), "tensor access outside declared bounds")
-    launches = [e for e in events if e["kind"] == "launch"]
-    grid = step["grid"]
-    expected = set(itertools.product(*(range(n) for n in grid)))
-    observed = [tuple(e["program"]) for e in launches]
-    require(len(observed) == len(set(observed)) and set(observed) == expected, "grid has missing/duplicate programs")
-    if expected and any(step["expected"].values()):
-        require(bool(accesses), "tensor access trace missing")
-    cores = {i for i in range(case["core_mask"].bit_length()) if case["core_mask"] & (1 << i)}
-    require(all(e["core"] in cores and 0 <= e["start"] < e["end"] for e in launches), "invalid core or launch interval")
-    if "schedule" in case["features"] and len(expected) >= len(cores):
-        require({e["core"] for e in launches} == cores, "requested cores were not exercised")
-    for feature in ("rvv", "zvt"):
-        if feature in case["features"]:
-            require(any(e["kind"] == feature for e in events), "no executed " + feature + " evidence")
-    transfers = [e for e in events if e["kind"] == "dma"]
-    if "dma" in case["features"]:
-        require(bool(transfers), "no DMA evidence")
-        for e in transfers:
-            require(e["success"] is True and 0 <= e["start"] < e["end"] and e["bytes"] > 0,
-                    "failed or malformed DMA interval")
-        path = case.get("storage_path", ["dram", "dtcm", "dram"])
-        edges = {(e["source"], e["destination"]) for e in transfers}
-        require(set(zip(path, path[1:])) <= edges, "missing storage path edges")
-        # Preserve the current prototype's same-core DMA/kernel exclusion.
-        for transfer in transfers:
-            require(not any(transfer["core"] == e["core"] and
-                            max(transfer["start"], e["start"]) < min(transfer["end"], e["end"])
-                            for e in launches), "same-core DMA/kernel overlap is not enabled")
-    if "overlap" in case["features"]:
-        require(any(t["core"] != e["core"] and max(t["start"], e["start"]) < min(t["end"], e["end"])
-                    for t in transfers for e in launches), "no cross-core transfer/compute overlap")
-
-
 def verify_response(case, request, response, root):
-    require(response.get("protocol") == 1, "response protocol mismatch")
+    require(response.get("protocol") == 2, "response protocol mismatch")
     require(response.get("nonce") == request["nonce"] and
             response.get("request_sha256") == request["request_sha256"], "stale or mismatched response")
     records = response.get("artifacts", {})
@@ -139,12 +97,16 @@ def verify_response(case, request, response, root):
                 ("triton_commit", "llvm_commit", "coral_commit", "abi", "target")), "incomplete build identity")
     require(build.get("kernel_source_sha256") == request["kernel_source_sha256"], "source identity differs")
     require(build.get("pipeline") == request["pipeline"], "regression did not use the current mainline")
+    if case["mode"] in ("aot", "jit"):
+        require(build.get("abi_version") in (2, 3) if case["error"] == "NC_ABI_VERSION" else
+                build.get("abi_version") == request["abi_version"], "runtime ABI does not match the request")
     if case["error"]:
         require(response.get("status") == "error", "expected a diagnostic")
         diagnostic = response.get("diagnostic", {})
         require(diagnostic.get("code") == case["error"] and bool(diagnostic.get("message")) and
                 bool(diagnostic.get("stage")), "wrong/incomplete diagnostic")
         trace = json.loads(artifact(records, "trace", root))
+        require(trace.get("protocol") == 2, "trace protocol must be 2")
         if case["error"] == "NC_DMA_ERROR":
             require(any(e["kind"] == "dma_error" and e["completed_bytes"] > 0 for e in trace["events"]),
                     "missing injected partial DMA failure")
@@ -153,7 +115,8 @@ def verify_response(case, request, response, root):
             require(recovery.get("old_handles_invalid") is True and recovery.get("restart_verified") is True,
                     "recovery/restart evidence missing")
         else:
-            require(not any(e["kind"] == "launch" for e in trace["events"]), "invalid request was launched")
+            require(not any(e["kind"] in ("launch", "dma", "access") for e in trace["events"]),
+                    "invalid request executed work before validation")
         return
     require(response.get("status") == "ok", "adapter reported failure")
     results = response.get("results", [])
@@ -163,16 +126,34 @@ def verify_response(case, request, response, root):
         records = result.get("artifacts", {})
         if not case.get("zero_launch"):
             ttir = artifact(records, "ttir", root).decode()
-            require("tt.func" in ttir and ("tt.load" in ttir or "tt.store" in ttir),
+            require(re.search(r"tt\.func\s+(?:public\s+)?@" + re.escape(source["kernel"]) + r"\b", ttir) is not None,
                     "TTIR does not contain the source kernel")
+            require("tt.return" in ttir, "TTIR return missing")
+            if source["kernel"] == "empty_kernel":
+                require("tt.load" not in ttir and "tt.store" not in ttir, "empty kernel unexpectedly accesses memory")
+            else:
+                require("tt.store" in ttir, "TTIR store missing")
             verification = json.loads(artifact(records, "verification", root))
             require(verification.get("ttir") is True, "TTIR verifier did not pass")
         if case["mode"] == "frontend":
             continue
+        if case["mode"] == "ir":
+            lowered = artifact(records, "llvm_dialect", root).decode()
+            require("llvm.func" in lowered and "llvm.return" in lowered and "tt.func" not in lowered,
+                    "LLVM dialect checkpoint is incomplete")
+            require(verification.get("llvm_dialect") is True, "LLVM dialect verifier did not pass")
+            continue
         require(result.get("execution") in ("rtl", "device"), "not Coral execution")
+        invocation = json.loads(artifact(records, "invocation", root))
+        require(invocation.get("protocol") == 2 and invocation.get("backend") == "coral" and
+                invocation.get("api") == ("kernel[grid](...)" if case["mode"] == "jit" else "aot_bridge") and
+                invocation.get("kernel") == source["kernel"] and invocation.get("grid") == source["grid"] and
+                invocation.get("step") == index and invocation.get("request_sha256") == request["request_sha256"],
+                "invocation does not prove the requested AOT/JIT route")
         # A zero grid may return without compiling or launching any ELF.
         if not case.get("zero_launch"):
             check_elf(artifact(records, "elf", root))
+            require(invocation.get("compiled_elf_sha256") == records["elf"]["sha256"], "invoked ELF differs from compiled ELF")
             artifact(records, "llir", root)
             require(verification.get("llvm") is True and verification.get("elf") is True, "LLVM/ELF checks missing")
         if "structured" in case["features"]:
@@ -210,13 +191,14 @@ def main():
     parser.add_argument("--adapter", type=Path, help="Python script: --request FILE --response FILE")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--timeout", type=float, default=300)
+    parser.add_argument("--capabilities", type=Path, help="optional per-target JSON manifest with validated_capabilities")
     args = parser.parse_args()
-    selected = [c for c in cases() if (int(c["stage"][1:]) <= int(args.stage[1:]) if args.cumulative
-                                     else c["stage"] == args.stage) and
-                (not args.case or c["id"] in args.case) and
-                (args.include_optional or bool(args.case) or not c.get("optional"))]
-    require(bool(selected), "no cases selected")
-    require(set(args.case) <= {c["id"] for c in selected}, "case ID is unknown or outside the selected stages")
+    if args.capabilities:
+        capabilities = json.loads(args.capabilities.read_text(encoding="utf-8"))["validated_capabilities"]
+    else:
+        capabilities = json.loads((HERE.parent / "plan.json").read_text(encoding="utf-8"))["testing"]["validated_capabilities"]
+    selected = select_cases(cases(), args.stage, cumulative=args.cumulative, ids=args.case,
+                            include_optional=args.include_optional, validated=capabilities)
     if args.list:
         print(json.dumps([{k: c[k] for k in ("id", "mode", "features", "error")} for c in selected], indent=2))
         return 0

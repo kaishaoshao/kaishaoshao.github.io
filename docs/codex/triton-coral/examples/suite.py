@@ -1,6 +1,7 @@
 """Deterministic inputs and independent references, using only the standard library."""
 
 import argparse
+import copy
 import json
 
 SENTINEL = 1515870810
@@ -43,6 +44,9 @@ def cases():
     add("S0.frontend", "S0", [scalar("scalar_copy", -3)], mode="frontend")
     add("S0.bad-target", "S0", [scalar("scalar_copy", -3)], mode="frontend",
         error="NC_UNSUPPORTED_TARGET", target_override="coral-invalid")
+    empty = step("empty_kernel", {"X": buffer("i32", [0]), "Y": buffer("i32", [0])})
+    add("S1.empty.frontend", "S1", [empty], mode="frontend")
+    add("S1.empty.llvm", "S1", [copy.deepcopy(empty)], mode="ir", checkpoint="llvm-dialect")
     add("S1.copy", "S1", [scalar("scalar_copy", -37)])
     add("S1.add", "S1", [scalar("scalar_add", 11, 7), scalar("scalar_add", -23, -5)])
     add("S1.wrap", "S1", [scalar("scalar_add", 2147483647)])
@@ -70,6 +74,10 @@ def cases():
     zero = vector(); zero["grid"] = [0, 1, 1]; zero["expected"]["Y"] = [SENTINEL] * 37
     add("S3.zero-grid", "S3", [zero], mode="jit", zero_launch=True)
     add("S3.bad-buffer", "S3", [vector()], mode="jit", error="NC_INVALID_BUFFER", invalidate="X")
+    six = step("sum_scalars", {"X": buffer("i32", [-10]), "Y": buffer("i32", [SENTINEL])},
+               {name: i + 1 for i, name in enumerate("ABCDEF")}, expected={"Y": [11]})
+    add("S3.abi-v3", "S3", [six], abi_version=3)
+    add("S3.abi-v2-capacity", "S3", [copy.deepcopy(six)], abi_version=2, error="NC_ABI_CAPACITY")
     m, n, sx, sy = 5, 7, 11, 9
     data = [SENTINEL] * (m * sx); expected = [SENTINEL] * (m * sy)
     for r in range(m):
@@ -127,7 +135,9 @@ def cases():
              "C": buffer("i32", [SENTINEL] * (m * sc), "dram")},
             {"M": m, "N": n, "K": k, "SA": sa, "SB": sb, "SC": sc},
             {"BM": 16, "BN": 16, "BK": 32}, [(m + 15) // 16, (n + 15) // 16, 1], {"C": out})],
-            cores=cores, features=("zvt", "schedule", "dma"))
+            cores=cores, features=("zvt", "schedule", "dma"), abi_version=3)
+    add("S8.reject-v2", "S8", [copy.deepcopy(result[-1]["steps"][0])], abi_version=2,
+        error="NC_ABI_CAPACITY")
     add("S9.overlap", "S9", [vector(257, 16, region="hbf")], cores=15,
         features=("schedule", "dma", "overlap"), storage_path=["hbf", "dram", "dtcm", "dram"],
         buffer_policy="double", compare_single_buffer=True)
@@ -137,7 +147,17 @@ def cases():
         add("S9." + feature, "S9", [step(kernel, {"X": buffer(dtype, floats),
             "Y": buffer("f32", [float(SENTINEL)] * 5)}, {"N": 5}, constants,
             expected={"Y": [x + 0.5 for x in floats]})], features=(feature,), optional=True,
-            tolerance={"rtol": 1e-6, "atol": 1e-6})
+            tolerance={"rtol": 1e-6, "atol": 1e-6}, capability=feature + ".basic.aot", requires_stage="S5")
+    # Preserve original case IDs. JIT mirrors are explicit cases with their own mode and earliest stage.
+    for original in list(result):
+        if original["mode"] != "aot" or original["error"]:
+            continue
+        mirror = copy.deepcopy(original)
+        mirror["id"] += ".jit"; mirror["mode"] = "jit"
+        mirror["stage"] = "S" + str(max(3, int(original["stage"][1:])))
+        if mirror.get("optional"):
+            mirror["capability"] = mirror["capability"].removesuffix(".aot") + ".jit"
+        result.append(mirror)
     return result
 
 

@@ -8,6 +8,25 @@
 
 实施说明、结构化任务和任务表固定为 `plan.md`、`plan.json`、`tasks.xlsx`。修改任务或验收时同步三者，保留已有任务 ID、状态与证据。具体规则见 [AGENTS.md](../AGENTS.md)。
 
+## 如何按本计划开发
+
+**以 Triton 语法为学习和实现主线：每次增加一个语法点，用测试确定语义，同时实现它需要的方言、分析和转换。** 先完成单核端到端，再沿同一条编译主线扩大支持范围。
+
+每个开发增量按下面六步完成：
+
+1. **读源程序**：在 [kernels.py](examples/kernels.py) 中找到本阶段 kernel，说明参数、数据类型、索引、mask 和预期输出。一次先处理一个操作或一种组合。
+2. **读测试**：在 [suite.py](examples/suite.py) 中查看同名阶段的输入、独立参考、边界和负例。58 个用例按阶段逐步启用，不要求先实现全部能力。
+3. **生成真实 TTIR**：运行 [dump_ttir.py](examples/dump_ttir.py)，找出当前尚未支持的操作、类型或循环状态，记录准备如何保持其语义。
+4. **补齐表示和 lowering**：普通算术和控制流使用标准方言；二维结构化访存需要时接入 TTS/Linalg；调度、存储和 tile 分别在 S6/S7/S8 引入自定义语义。每次转换都配 verifier 和对应 IR 检查。
+5. **接通真实执行**：实现当前阶段所需的编译/运行适配器，生成真实 ELF，装载到 Coral，使用独立参考检查结果、边界和执行轨迹。
+6. **累计回归再推进**：先跑当前阶段，再跑所有已支持阶段。旧用例走当前主线；任务完成状态只在相应出口有真实证据后更新。
+
+起步时先做 **S0 的版本/ABI/TTIR 检查，然后做 S1 的 scalar_copy 和 scalar_add**。目前可以直接运行主机侧自检、生成 TTIR、列出用例和生成请求。设备命令中的 `coral_test_adapter.py` 尚需在实现阶段接通，不能把该路径当成已有可执行后端。
+
+方言随语法需求逐步接入。S1 从标准 LLVM/Arith/CF 起步；S4 用新增二维与循环语法驱动 TTS/Linalg；S5 为归约增加 Vector/RVV lowering；S6/S7/S8 再分别落实 `coral_rt`、`coral_mem` 和计算 tile 方言。每个阶段的源码、修改任务、测试命令和出口见下文。
+
+本计划区分三种进展：**测试定义已提供、前端/主机侧检查通过、Coral 实际执行通过**。当前 14 个 kernel 和 58 个测试定义已提供，前端及测试框架已有核查结果；真实 ELF/设备执行、故障注入及性能仍按阶段实现和验收。有限浮点样例也不代表完整浮点语义已支持。
+
 ## 已确定的实施顺序
 
 以 Triton 语法和执行语义为主线，每次增加一个可测试子集，同时补齐所需方言、lowering 和教程。先完成标量 AOT，再依次支持 block/mask、JIT、二维 stride/广播/循环、归约/RVV、多维 grid/多核、分层存储和 dot/Zvt。
@@ -106,6 +125,27 @@ export CORAL_ADAPTER=/absolute/path/to/coral_test_adapter.py
 - 负例及 native 检查：非法 ABI 不启动；损坏 ELF 的解析器单元负例也需移植到真实 loader 测试。
 - 本阶段用例：S1.copy、S1.add、S1.wrap、S1.reload、S1.bad-abi。
 - 出口：G1 必需依赖不增加 TTS/RVV/DMA/多核。
+
+从下面两个最小程序开始。编译签名中 X、Y 均为指向 INT32 的设备指针，DELTA 是编译期常量。
+
+```python
+import triton
+import triton.language as tl
+
+
+@triton.jit
+def scalar_copy(X, Y):
+    value = tl.load(X)
+    tl.store(Y, value)
+
+
+@triton.jit
+def scalar_add(X, Y, DELTA: tl.constexpr):
+    value = tl.load(X)
+    tl.store(Y, value + DELTA)
+```
+
+先确认 scalar_copy 的真实 TTIR 包含加载和写回，再为 scalar_add 补齐常量及整数加法转换。随后接通 LLVM IR、入口包装、链接与控制 CPU 装载，在 core0 上验证输出。改变输入和 DELTA 后仍须算对，INT32_MAX+1 应按 32 位模运算得到 INT32_MIN。源码持续以 [kernels.py](examples/kernels.py) 为准。
 
 ```bash
 "$CORAL_PYTHON" "$CORAL_TUTORIAL/run_stage.py" --stage S1 --adapter "$CORAL_ADAPTER" --output "$CORAL_TEST_OUT/device"

@@ -2,7 +2,7 @@
   "date": "2026-11-18",
   "title": "Triton Coral 实施计划",
   "decision": "先用最小 TTIR 子集跑通真实 AOT 单核执行，再补齐基本 Triton 语义和标准 JIT；之后引入 Ascend 版 TTS/Linalg、RVV、多核和多级存储优化。",
-  "baseline_note": "实现起点采用 2026-11-17 的核查记录：triton-coral 为 dev/triton-coral 的 4f045a9d77；Coral 原型为 dev/ncoral-hbf-3dpim 的 f9ab975c。进入 S0 时复核当前工作树和工具链；已有骨架与硬件演示不代表本计划的端到端任务已经完成。",
+  "baseline_note": "2026-11-18 通过 compiler-1 SSH 复核：triton-coral 为 dev/triton-coral 的 4f045a9d77，Coral 原型为 dev/ncoral-hbf-3dpim 的 f9ab975c，两者工作树干净。后端仍为占位 LLIR/ELF；多核配置开启浮点与 BF16。仅完成源码核查，没有新增 Triton 生成代码执行或 RTL 回归证据。",
   "phases": [
     [
       "S0",
@@ -100,11 +100,11 @@
       "S0-01",
       "S0 基线",
       "确认固定工具链与构建",
-      "确认现有 backend 注册、Coral SDK、LLVM/MLIR 头库及 RISC-V target。只检查当前闭环所需依赖。",
+      "固定 Triton commit、Coral SDK/LLVM 补丁、MLIR 头库和 RISC-V target；记录实际 RTL 的浮点/BF16/RVV/Zvt 配置，按目标能力逐项启用。只检查当前闭环所需依赖。",
       "无",
       "cmake/llvm-info.json；Coral CMake",
       "可复现的版本和构建记录",
-      "LLVM 版本与补丁一致，现有插件可导入；此项不要求 TTS 编译成功。",
+      "版本、补丁和目标配置可复现，插件可导入；已开启浮点/BF16 不代表对应 Triton kernel 已验收，此项不要求 TTS 编译成功。",
       "中",
       "待开始"
     ],
@@ -124,11 +124,11 @@
       "S0-03",
       "S0 基线",
       "建立首批源程序与诊断入口",
-      "保存拷贝/加一的真实前端 TTIR、支持操作和类型白名单、阶段 IR、错误及数值参考。明确不支持项的诊断位置和配置。",
+      "保存拷贝/加一的真实前端 TTIR、阶段 IR、错误及数值参考。建立固定 Triton 版本的操作/类型/布局/地址区域支持矩阵，分别记录编译、执行和性能证据。",
       "S0-02",
       "现有 Coral 用例；测试及 debug 入口",
       "可重复的源程序与构建入口",
-      "未知操作、类型和配置给出阶段及源位置；保存输入、IR、ELF、配置和结果的来源，不以改名或 payload 存在验收。",
+      "未知操作、类型、布局和配置给出阶段及源位置；输入、IR、ELF、配置和结果可追踪。支持表不得把规划或占位产物标为执行通过。",
       "中",
       "待开始"
     ],
@@ -232,11 +232,11 @@
       "S2-03",
       "S2 基本语义",
       "支持逻辑 program 与顺序 grid",
-      "将 program_id/num_programs 读取到 ABI，先支持 1D grid，由 core0 顺序执行多个 program。",
+      "将 program_id/num_programs 读取到 ABI，先支持 1D grid，由 core0 顺序执行多个 program。一个 program 先由一个核完整执行，逻辑 tensor 在核内分段处理。",
       "S2-02",
       "kernel 参数；控制 runtime",
       "多 program 单核启动",
-      "grid 大于物理核数仍正确；核号不替代逻辑 ID，参数更新与前次执行完成有序。",
+      "grid 大于物理核数仍正确；核号不替代逻辑 ID，参数更新与前次执行完成有序。后续多核复用此映射，不以物理 VLEN 限制逻辑 BLOCK。",
       "中",
       "待开始"
     ],
@@ -404,7 +404,7 @@
       "S5-02",
       "单核 RVV 回归",
       "G5 RVV 报告",
-      "正确性、指令和资源检查通过；当前 VLEN=128 为目标配置实例，不能宣称任意 VLEN 已执行验证。",
+      "整数主线的正确性、指令和资源检查通过；VLEN=128 仅为当前实例。FP32/BF16 虽有配置基础，仍在 S9-03 按独立能力项验收，不加入 G5 必需范围。",
       "中",
       "待开始"
     ],
@@ -428,7 +428,7 @@
       "S6-01",
       "Dialect/CoralRT；Runtime lowering",
       "多核 Launch Plan",
-      "核内代码与控制计划作用域清楚；逻辑任务、placement、失败与完成事件可验证。",
+      "核内代码与控制计划作用域清楚；逻辑任务、placement、失败与完成事件可验证。事件依赖不替代原子操作，核内 barrier 不解释为跨 program 全局 barrier。",
       "高",
       "待开始"
     ],
@@ -452,7 +452,7 @@
       "S6-03",
       "多核数值及调度回归",
       "G6 多核报告",
-      "任务无遗漏重复，私有隔离及共享可见性正确；不隐式添加所有 program 参与的全局 barrier。",
+      "任务无遗漏重复，私有隔离及共享可见性正确；不隐式添加全局 barrier。不承诺未实现的跨 program 自旋/协作进展，原子轮询和 persistent 协作另按能力契约验收。",
       "中",
       "待开始"
     ],
@@ -464,7 +464,7 @@
       "S6-04",
       "Dialect/CoralMem；region 规划",
       "显式分层 buffer 与搬运契约",
-      "HBF 写、非法私有 owner、容量超限和不存在的路径被拒绝；物理地址映射不等同 LLVM 地址空间编号。",
+      "拒绝 HBF 写、非法 owner、容量超限和不存在的路径。32 位映射窗口与物理容量、设备指针宽度分别记录；超窗口显式分块或诊断，禁止静默截断。",
       "高",
       "待开始"
     ],
@@ -476,7 +476,7 @@
       "S7-01,S4-02",
       "AccessRange；PromoteToLocal；MemoryPlan",
       "静态内存和访问计划",
-      "参数、栈、scratch、数据容量不重叠；局部指针不会重复加 program 偏移，尾部不扩大越界访问。",
+      "参数、栈、scratch、数据容量不重叠；局部指针不重复加 program 偏移。全局 tensor 与局部副本保持别名身份，写回、失效和跨核消费者依赖明确。",
       "高",
       "待开始"
     ],
@@ -488,7 +488,7 @@
       "S7-02,S6-03",
       "CoralMemToRuntime；DMA 适配",
       "可执行的搬运与计算计划",
-      "消费者等待可见完成；读写失败报告已完成字节和错误任务，输出可能部分写入，不承诺回滚。重试只在证明幂等或重新初始化后允许。",
+      "完成意味着目标消费者可见，明确 CPU/RVV/DMA 的排序边界；依赖不能模拟原子读改写。失败记录已完成字节和错误任务，部分输出不回滚；重试须证明幂等或重新初始化。",
       "高",
       "待开始"
     ],
@@ -524,7 +524,7 @@
       "S5-03,S4-04",
       "TritonToLinalg；矩阵合法化",
       "前端可达的矩阵 IR",
-      "输入 signedness、累加类型、K 分块和尾部正确，测试源程序符合本地前端约束。",
+      "从固定前端合法源程序验证形状、signedness、累加类型、K 分块和尾部；按 dtype/布局/精度模式登记支持。普通 dot、dot_scaled 和低比特格式分别验收。",
       "高",
       "待开始"
     ],
@@ -592,11 +592,11 @@
       "S9-03",
       "S9 优化",
       "按需求扩展算子与类型",
-      "在稳定主线上逐项加入融合 epilogue、卷积、更多类型及非规则访问；每项明确所需硬件能力与独立数值规则。",
+      "按需求逐项实现融合 epilogue、卷积、FP32/BF16 及其他类型、数学函数、scan/sort/topk、非规则访存、原子和 descriptor。分别选择原生指令、合法软件展开或明确拒绝；不纳入 G1 前置。",
       "S9-02,S8-04",
       "Linalg 扩展；Coral 转换；数值测试",
       "逐项支持清单及 G9 报告",
-      "有转换、目标代码和数值证据，未验证能力保持明确边界，不以更换后缀或宿主代算替代。",
+      "每项记录 dtype/布局/精度、转换、目标代码和数值证据。浮点覆盖舍入/特殊值；原子覆盖不可分割性/内存序/作用域；descriptor 覆盖边界/布局。PTX 和厂商接口不直接承诺兼容，性能单独验收。 不以更换后缀或宿主代算替代设备执行。",
       "高",
       "待开始"
     ]
@@ -842,6 +842,34 @@
     [
       "RISC-V 调用及 ELF ABI",
       "https://riscv-non-isa.github.io/riscv-elf-psabi-doc/"
+    ],
+    [
+      "Triton 语言接口",
+      "https://triton-lang.org/main/python-api/triton.language.html"
+    ],
+    [
+      "Triton 数值语义",
+      "https://triton-lang.org/main/python-api/triton-semantics.html"
+    ],
+    [
+      "Triton dot",
+      "https://triton-lang.org/main/python-api/generated/triton.language.dot.html"
+    ],
+    [
+      "Triton atomic_add",
+      "https://triton-lang.org/main/python-api/generated/triton.language.atomic_add.html"
+    ],
+    [
+      "Triton debug_barrier",
+      "https://triton-lang.org/main/python-api/generated/triton.language.debug_barrier.html"
+    ],
+    [
+      "Triton tensor descriptor",
+      "https://triton-lang.org/main/python-api/generated/triton.language.make_tensor_descriptor.html"
+    ],
+    [
+      "Triton inline assembly",
+      "https://triton-lang.org/main/python-api/generated/triton.language.inline_asm_elementwise.html"
     ]
   ],
   "schema_version": 1,
@@ -925,6 +953,201 @@
       "每阶段记录操作/类型/布局/能力白名单；编译、静态资源检查和执行证据分开，错误包含阶段、位置及相关配置。",
       "输入、TTIR、LLVM、ELF、镜像、目标配置和结果可对应；不支持项有明确错误。",
       "S0-03,S1-06"
+    ],
+    [
+      "D11",
+      "program 到核的映射",
+      "一个 program 初期完整放在一个核，逻辑 tensor 在核内分段执行；多个 program 通过调度分配到可用核。核内 barrier 与跨 program 依赖分开。",
+      "单核顺序与多核执行一致；grid 大于核数、BLOCK 大于 VLEN 均正确。",
+      "S2-03,S6-02,S6-04"
+    ],
+    [
+      "D12",
+      "浮点及数学语义",
+      "浮点/BF16 配置启用只作硬件基础。按 dtype 和操作验证类型提升、转换、舍入、NaN/Inf/非正规数/正负零、FMA 与归约误差。",
+      "按固定版本和精度约定比较独立参考；软件展开与原生路径分别记录，未验收格式明确拒绝。",
+      "S0-01,S5-03,S9-03"
+    ],
+    [
+      "D13",
+      "原子与调度进展",
+      "设备原子须覆盖相关核和访问路径的不可分割读改写、返回值、内存序与作用域；队列事件和 AXI 仲裁不构成原子证明。跨 program 轮询另定义进展条件。",
+      "并发冲突更新、CAS/旧值、发布订阅及支持的轮询场景通过；不支持作用域或数据类型显式诊断。",
+      "S6-02,S6-04,S9-03"
+    ],
+    [
+      "D14",
+      "局部副本与可见性",
+      "保留 DRAM 全局 buffer 和 SRAM/DTCM 副本的别名身份、读写集合、owner、写回和失效规则；完成事件明确表示目标消费者可观察数据。",
+      "跨核生产消费、重叠 view、buffer 复用和 DMA 背压不出现陈旧副本或提前消费。",
+      "S7-02,S7-03,S7-05"
+    ],
+    [
+      "D15",
+      "大容量和地址窗口",
+      "区分物理容量、32 位映射窗口、设备指针与 i64 数据计算。窗口切换若引入，需规定映射版本、指针有效期和在途任务互斥。",
+      "地址加法溢出和跨窗口访问有诊断或已验证分块；旧指针不得静默指向新窗口。",
+      "S0-02,S7-01"
+    ],
+    [
+      "D16",
+      "高级接口与运行时边界",
+      "descriptor 独立降低到合法访存/DMA，保持 shape/stride/padding；内联汇编匹配 RISC-V 目标。厂商专用接口和完整 Torch 设备适配不自动计入通用支持。",
+      "descriptor 的边界/布局/对齐及错误输入逐项验证；不支持的 PTX/接口明确诊断，JIT/计时/调试分别留证。",
+      "S3-01,S3-04,S9-03"
     ]
-  ]
+  ],
+  "compatibility": {
+    "reviewed_at": "2026-11-18",
+    "target": "固定 Triton commit 的通用计算子集，按操作、dtype、布局和目标能力逐项扩展；不承诺全部 Python、厂商汇编或所有高级接口兼容。",
+    "evidence_policy": "硬件配置、编译通过、设备执行正确和性能达标分开记录。此矩阵为适配判断，不能替代自动生成 kernel 的执行证据。",
+    "headers": [
+      "能力",
+      "当前判断",
+      "实现与验收要求",
+      "对应任务",
+      "编译执行状态"
+    ],
+    "rows": [
+      [
+        "控制流与 constexpr",
+        "原则上可支持",
+        "由固定前端产生合法 IR，循环/分支 lowering 保持语义与资源限制。",
+        "S1-01,S2-01,S9-03",
+        "未端到端验收"
+      ],
+      [
+        "grid 与逻辑 program",
+        "可通过运行时实现",
+        "一个 program 初期放在一个核；逻辑 ID 独立于物理核号，多维 grid 后续扩展。",
+        "S2-03,S6-01,S6-04",
+        "未端到端验收"
+      ],
+      [
+        "形状、广播与重排",
+        "可通过转换实现",
+        "逻辑 tensor 分段映射到循环、RVV 和临时空间，BLOCK 不等于 VLEN。",
+        "S2-01,S4-04,S5-01",
+        "未端到端验收"
+      ],
+      [
+        "整数与宽位运算",
+        "先实现 INT32 子集",
+        "明确 signedness/模运算；i64 可合法展开，但不同于 64 位设备寻址。",
+        "S1-01,S9-03",
+        "未端到端验收"
+      ],
+      [
+        "masked load/store",
+        "可支持，必须保护真实访存",
+        "覆盖 other、尾部、非对齐和别名，mask 为假不触发访存。",
+        "S2-02,S2-04,S7-02",
+        "未端到端验收"
+      ],
+      [
+        "非规则 gather/scatter",
+        "需逐项实现",
+        "寄存器 gather 不能证明任意地址向量访存；合法地址可按能力标量展开。",
+        "S4-02,S9-03",
+        "未实现或未验收"
+      ],
+      [
+        "归约、scan、sort、topk",
+        "可通过算法实现",
+        "先验收整数归约，再分别实现扫描/排序/选择，检查临时空间与数值规则。",
+        "S4-04,S5-02,S9-03",
+        "未端到端验收"
+      ],
+      [
+        "FP32 与 BF16",
+        "多核配置已有硬件基础",
+        "检查转换、运算覆盖、特殊值、舍入和误差；不能用配置开关代替生成代码验收。",
+        "S0-01,S5-03,S9-03",
+        "仅确认配置启用"
+      ],
+      [
+        "FP16/FP64/FP8 等格式",
+        "不能统一承诺",
+        "逐格式确定原生、软件展开或拒绝，类型转换和计算分别验证。",
+        "S9-03",
+        "未逐格式验收"
+      ],
+      [
+        "dot 与 dot_scaled",
+        "按类型及模式逐项支持",
+        "RVV/Zvt 的输入、累加、精度、布局和 K 分块分别核对；INT8 不外推其他类型。",
+        "S8-01,S8-04,S9-03",
+        "未端到端验收"
+      ],
+      [
+        "atomic 操作",
+        "完整链路尚未核实",
+        "不可分割读改写、旧值、内存序、作用域和全访问路径验证；不能以事件依赖替代。",
+        "S6-02,S9-03",
+        "未建立完整支持证据"
+      ],
+      [
+        "barrier 与协作调度",
+        "必须区分同步范围",
+        "核内同步不是全 grid barrier；跨 program 轮询和协作内核另定义可见性及进展条件。",
+        "S6-02,S6-04,S9-03",
+        "未验收协作能力"
+      ],
+      [
+        "tensor descriptor",
+        "需要独立 lowering",
+        "保留 shape/stride/padding/边界和对齐；选择普通访存或 DMA，不假设存在 NVIDIA TMA。",
+        "S7-02,S9-03",
+        "尚未实现"
+      ],
+      [
+        "内联汇编与厂商接口",
+        "存在目标相关边界",
+        "Coral 汇编需匹配 RISC-V；PTX 和 CUDA 专用接口需改写、独立实现或明确拒绝。",
+        "S0-03,S9-03",
+        "未声明直接兼容"
+      ],
+      [
+        "JIT 与设备运行时",
+        "需完整实现并独立验收",
+        "加载、分配、串行 stream、缓存、计时、错误和调试按范围建设，Torch 集成另列需求。",
+        "S3-01,S3-04,S9-01",
+        "当前后端为骨架"
+      ]
+    ],
+    "hardware_evidence_headers": [
+      "核查项",
+      "仓库",
+      "分支",
+      "提交",
+      "源码位置",
+      "结论与边界"
+    ],
+    "hardware_evidence": [
+      [
+        "编译器执行链",
+        "triton-coral",
+        "dev/triton-coral",
+        "4f045a9d77",
+        "third_party/coral/backend/compiler.py:86-96",
+        "make_llir 返回输入文本，make_elf 返回占位字节，尚无真实 ELF 闭环证据。"
+      ],
+      [
+        "浮点配置",
+        "coralnpu",
+        "dev/ncoral-hbf-3dpim",
+        "f9ab975c",
+        "experiments/multicore/Cluster.scala:77-81",
+        "enableFloat/enableZfbfmin 为 true，向量 BF16 随 RVV 启用；不是 Triton 执行验收。"
+      ],
+      [
+        "存储锁请求",
+        "coralnpu",
+        "dev/ncoral-hbf-3dpim",
+        "f9ab975c",
+        "experiments/multicore/die/Storage.scala:40",
+        "请求合法性要求 !a.lock.asBool；此路径拒绝锁请求，不能据此推断其他路径已支持完整原子。"
+      ]
+    ]
+  }
 }

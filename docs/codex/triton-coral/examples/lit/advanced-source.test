@@ -1,0 +1,2 @@
+# RUN: %coral_python %S/../dump_ttir.py --frontend-target %coral_frontend --stage S9 --case S9.atomic-add --case S9.gather --case S9.scatter --case S9.sort --output %t
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=ATOMIC --input-file=%t/S9.atomic-add.0.ttir

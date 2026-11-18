@@ -65,6 +65,11 @@ def cases():
     add("S2.other", "S2", [step("masked_other", {"X": buffer("i32", [3, 4, 5]),
         "Y": buffer("i32", [SENTINEL] * 16)}, {"N": 3}, {"BLOCK": 16},
         expected={"Y": [3, 4, 5] + [7] * 13})])
+    x = [i - 20 for i in range(37)]
+    y = [31 - 2 * i for i in range(37)]
+    add("S2.vector-add", "S2", [step("vector_add", {"X": buffer("i32", x),
+        "Y": buffer("i32", y), "Z": buffer("i32", [SENTINEL] * 37)},
+        {"N": 37}, {"BLOCK": 16}, [3, 1, 1], {"Z": [a + b for a, b in zip(x, y)]})])
     add("S2.bad-block", "S2", [vector(3, 3)], error="NC_UNSUPPORTED_SHAPE")
     changed = vector()
     changed["buffers"]["X"]["values"] = [i32(x + 19) for x in changed["buffers"]["X"]["values"]]
@@ -97,18 +102,34 @@ def cases():
         add(f"S4.while.{flag}", "S4", [step("scalar_while", {"X": buffer("i32", [9]),
             "Y": buffer("i32", [SENTINEL])}, {"R": 3, "FLAG": flag},
             expected={"Y": [9 + 3 * (2 if flag else -1)]})], features=("structured",))
+    tile = [i * 3 - 7 for i in range(8)]
+    add("S4.transpose", "S4", [step("transpose_tile", {"X": buffer("i32", tile),
+        "Y": buffer("i32", [SENTINEL] * 8)}, expected={"Y": tile[::4] + tile[1::4] + tile[2::4] + tile[3::4]})],
+        features=("structured",))
     for n in (1, 3, 37, 1000):
         data = [i % 31 - 15 for i in range(n)]; block = 1 << (n - 1).bit_length()
         for kernel, value in (("reduce_sum", i32(sum(data))), ("reduce_max", max(data))):
             add(f"S5.{kernel}.n{n}", "S5", [step(kernel, {"X": buffer("i32", data),
                 "Y": buffer("i32", [SENTINEL])}, {"N": n}, {"BLOCK": max(16, block)},
                 expected={"Y": [value]})], features=("rvv",))
+    for data in ([-5, -2, -2, -7, -3], [-2147483648]):
+        add(f"S5.argmax.n{len(data)}", "S5", [step("argmax_i32", {"X": buffer("i32", data),
+            "Y": buffer("i32", [SENTINEL])}, {"N": len(data)}, {"BLOCK": 16},
+            expected={"Y": [data.index(max(data))]})])
+    data = [i % 7 - 2 for i in range(37)]
+    add("S5.scan", "S5", [step("prefix_sum", {"X": buffer("i32", data),
+        "Y": buffer("i32", [SENTINEL] * 37)}, {"N": 37}, {"BLOCK": 64},
+        expected={"Y": [sum(data[:i + 1]) for i in range(37)]})])
     for cores in (1, 3, 15):
         for nx, ny in ((1, 1), (5, 13)):
             out = [x + 100 * y + 10000 * nx + 1000000 * ny for y in range(ny) for x in range(nx)]
             add(f"S6.grid.{nx}x{ny}.mask{cores}", "S6", [step("grid_ids",
                 {"Y": buffer("i32", [SENTINEL] * (nx * ny))}, grid=[nx, ny, 1], expected={"Y": out})],
                 cores=cores, features=("schedule",))
+    nx, ny, nz = 3, 5, 5
+    out = [x + 10 * y + 100 * z + 1000 * nz for z in range(nz) for y in range(ny) for x in range(nx)]
+    add("S6.grid.3d", "S6", [step("grid_ids_3d", {"Y": buffer("i32", [SENTINEL] * len(out))},
+        grid=[nx, ny, nz], expected={"Y": out})], cores=15, features=("schedule",))
     for cores in (1, 15):
         add(f"S7.tiers.mask{cores}", "S7", [vector(257, 16, region="hbf")], cores=cores,
             features=("schedule", "dma"), storage_path=["hbf", "dram", "dtcm", "dram"], buffer_policy="single")
@@ -148,6 +169,23 @@ def cases():
             "Y": buffer("f32", [float(SENTINEL)] * 5)}, {"N": 5}, constants,
             expected={"Y": [x + 0.5 for x in floats]})], features=(feature,), optional=True,
             tolerance={"rtol": 1e-6, "atol": 1e-6}, capability=feature + ".basic.aot", requires_stage="S5")
+    data = [17, -8, 5, 11, -2, 42]
+    indices = [4, 0, 5, 3, 1, 2]
+    for scatter in (False, True):
+        operation = "scatter" if scatter else "gather"
+        expected = [data[indices.index(i)] if scatter else data[indices[i]] for i in range(len(data))]
+        add("S9." + operation, "S9", [step("indexed_copy", {"X": buffer("i32", data),
+            "Index": buffer("i32", indices), "Y": buffer("i32", [SENTINEL] * len(data))},
+            {"N": len(data)}, {"SCATTER": scatter, "BLOCK": 8}, expected={"Y": expected})],
+            optional=True, capability=f"{operation}.basic.aot", requires_stage="S5")
+    data = [3, -2, 7, 3, 0, -9, 7, 1]
+    add("S9.sort", "S9", [step("sort_i32", {"X": buffer("i32", data),
+        "Y": buffer("i32", [SENTINEL] * 8)}, constants={"BLOCK": 8},
+        expected={"Y": sorted(data, reverse=True)})],
+        optional=True, capability="sort.basic.aot", requires_stage="S5")
+    add("S9.atomic-add", "S9", [step("atomic_add_i32", {"Counter": buffer("i32", [41]),
+        "Old": buffer("i32", [SENTINEL])}, {"DELTA": 2}, expected={"Counter": [43], "Old": [41]})],
+        optional=True, capability="atomic_add.single_program.aot", requires_stage="S6")
     # Preserve original case IDs. JIT mirrors are explicit cases with their own mode and earliest stage.
     for original in list(result):
         if original["mode"] != "aot" or original["error"]:

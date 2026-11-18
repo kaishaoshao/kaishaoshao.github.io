@@ -48,7 +48,14 @@ def validate_plan(folder=HERE.parent, *, workbook=False):
         row_present(row[:5])
     for row in data["syntax_whitelist"]:
         row_present(row)
+    for row in data["standard_test_gates"]:
+        row_present(row)
     actual = inventory()
+    counts = data["testing"]["generated_counts"]
+    if counts != {"kernels": len({name for stage in actual for name in stage["kernels"]}), "cases": len(cases())}:
+        raise ValueError("generated case/kernel counts differ")
+    if [row[0] for row in data["standard_test_gates"]] != [stage["stage"] for stage in actual]:
+        raise ValueError("standard test gates must cover each stage in order")
     if len(actual) != len(data["syntax_stages"]):
         raise ValueError("stage inventory length differs")
     for planned, observed in zip(data["syntax_stages"], actual):
@@ -90,6 +97,9 @@ def validate_plan(folder=HERE.parent, *, workbook=False):
                                stage["positive_boundary"], stage["negative"], stage["exercise"]]
                         if [values.get(f"{col}{index}", "") for col in "ABCDEFG"] != [str(v) for v in row]:
                             raise ValueError("XLSX lesson inventory differs: " + stage["stage"])
+                    for index, row in enumerate(data["standard_test_gates"], 61):
+                        if [values.get(f"{col}{index}", "") for col in "ABDF"] != row:
+                            raise ValueError("XLSX standard test gate differs: " + row[0])
                 if key == "contracts":
                     for index, row in enumerate(data["abi_contract"]["3"]["fields"], 74):
                         if [values.get(f"{col}{index}", "") for col in "ABCD"] != [str(v) for v in row]:

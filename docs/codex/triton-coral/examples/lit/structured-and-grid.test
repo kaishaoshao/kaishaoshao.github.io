@@ -1,0 +1,8 @@
+# RUN: %coral_python %S/../dump_ttir.py --frontend-target %coral_frontend --stage S6 --cumulative --case S4.stride-broadcast --case S4.transpose --case S4.loop.r0 --case S4.while.0 --case S5.reduce_sum.n1 --case S5.scan --case S6.grid.3d --output %t
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=STRIDE --input-file=%t/S4.stride-broadcast.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=TRANSPOSE --input-file=%t/S4.transpose.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=LOOP --input-file=%t/S4.loop.r0.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=WHILE --input-file=%t/S4.while.0.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=REDUCE --input-file=%t/S5.reduce_sum.n1.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=SCAN --input-file=%t/S5.scan.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=GRID3D --input-file=%t/S6.grid.3d.0.ttir

@@ -20,10 +20,22 @@
 // BLOCK: tt.load
 // BLOCK: tt.store
 
+// VECADD-LABEL: tt.func public @vector_add
+// VECADD: %[[MASK:[a-zA-Z0-9_]+]] = arith.cmpi slt
+// VECADD: tt.load {{.*}}, %[[MASK]],
+// VECADD: tt.load {{.*}}, %[[MASK]],
+// VECADD: tt.store {{.*}}, %[[MASK]] :
+
 // STRIDE: tt.func public @strided_bias
 // STRIDE-DAG: tt.expand_dims
 // STRIDE-DAG: tt.addptr
 // STRIDE: tt.store
+
+// TRANSPOSE-LABEL: tt.func public @transpose_tile
+// TRANSPOSE: tt.reshape
+// TRANSPOSE: tt.trans {{.*}}tensor<2x4xi32> -> tensor<4x2xi32>
+// TRANSPOSE: tt.reshape
+// TRANSPOSE: tt.store
 
 // LOOP: scf.for
 // LOOP: tt.load
@@ -32,13 +44,24 @@
 // WHILE: scf.if
 
 // REDUCE: "tt.reduce"
+// SCAN: "tt.scan"{{.*}}axis = 0
+// SCAN: tt.scan.return
 
 // GRID-DAG: tt.get_program_id x
 // GRID-DAG: tt.get_program_id y
 // GRID-DAG: tt.get_num_programs x
 // GRID-DAG: tt.get_num_programs y
 
+// GRID3D-LABEL: tt.func public @grid_ids_3d
+// GRID3D-DAG: tt.get_program_id z
+// GRID3D-DAG: tt.get_num_programs z
+// GRID3D: tt.store
+
 // DOT: tt.dot
+
+// ATOMIC-LABEL: tt.func public @atomic_add_i32
+// ATOMIC: %[[OLD:[a-zA-Z0-9_]+]] = tt.atomic_rmw add, relaxed, gpu
+// ATOMIC: tt.store {{.*}}, %[[OLD]] :
 
 // STRUCTURED: linalg.
 

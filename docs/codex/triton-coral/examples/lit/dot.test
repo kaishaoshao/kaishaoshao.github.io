@@ -1,0 +1,3 @@
+# REQUIRES: dot-frontend
+# RUN: %coral_python %S/../dump_ttir.py --frontend-target %coral_frontend --stage S8 --case S8.dot.16x16x32.mask1 --output %t
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=DOT --input-file=%t/S8.dot.16x16x32.mask1.0.ttir

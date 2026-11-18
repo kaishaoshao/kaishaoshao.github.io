@@ -130,6 +130,30 @@ class TutorialContractTests(unittest.TestCase):
         self.assertEqual(self.by_id["S4.loop.r0"]["steps"][0]["expected"]["Y"], [0] * 5)
         self.assertEqual(self.by_id["S3.abi-v3"]["steps"][0]["expected"]["Y"], [11])
 
+    def test_new_stage_cases_check_tail_indices_and_reference_values(self):
+        expected = {
+            "S2.vector-add": {"Z": list(range(11, -26, -1))},
+            "S4.transpose": {"Y": [-7, 5, -4, 8, -1, 11, 2, 14]},
+            "S5.argmax.n5": {"Y": [1]},
+            "S5.argmax.n1": {"Y": [0]},
+            "S9.gather": {"Y": [-2, 17, 42, 11, -8, 5]},
+            "S9.scatter": {"Y": [-8, -2, 42, 11, 17, 5]},
+            "S9.atomic-add": {"Counter": [43], "Old": [41]},
+        }
+        for identity, outputs in expected.items():
+            with self.subTest(case=identity):
+                case = self.by_id[identity]
+                item = case["steps"][0]
+                self.assertEqual(item["expected"], outputs)
+                check_trace(_synthetic_trace(item, case), item, case)
+        grid = self.by_id["S6.grid.3d"]["steps"][0]
+        self.assertEqual(program_accesses(grid, [2, 4, 4]), {("Y", "write"): {74}})
+        self.assertEqual(grid["expected"]["Y"][74], 5442)
+        tail = self.by_id["S2.vector-add"]["steps"][0]
+        active = set(range(32, 37))
+        self.assertEqual(program_accesses(tail, [2, 0, 0]),
+                         {("X", "read"): active, ("Y", "read"): active, ("Z", "write"): active})
+
     def test_plan_data_markdown_and_abi_agree(self):
         self.assertTrue(validate_plan()["consistent"])
 

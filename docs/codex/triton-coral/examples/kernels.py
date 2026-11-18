@@ -34,6 +34,15 @@ def block_add(X, Y, N, DELTA: tl.constexpr, BLOCK: tl.constexpr):
 
 
 @triton.jit
+def vector_add(X, Y, Z, N, BLOCK: tl.constexpr):
+    offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
+    mask = offsets < N
+    x = tl.load(X + offsets, mask=mask, other=0)
+    y = tl.load(Y + offsets, mask=mask, other=0)
+    tl.store(Z + offsets, x + y, mask=mask)
+
+
+@triton.jit
 def block_select(X, Y, N, POSITIVE: tl.constexpr, BLOCK: tl.constexpr):
     offsets = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
     value = tl.load(X + offsets, offsets < N, other=0)
@@ -73,6 +82,13 @@ def loop_sum(X, Y, N, R, STRIDE, BLOCK: tl.constexpr):
 
 
 @triton.jit
+def transpose_tile(X, Y):
+    offsets = tl.arange(0, 8)
+    tile = tl.reshape(tl.load(X + offsets), (2, 4))
+    tl.store(Y + offsets, tl.reshape(tl.trans(tile), (8,)))
+
+
+@triton.jit
 def scalar_while(X, Y, R, FLAG):
     value = tl.load(X)
     index = 0
@@ -100,12 +116,33 @@ def reduce_max(X, Y, N, BLOCK: tl.constexpr):
 
 
 @triton.jit
+def argmax_i32(X, Y, N, BLOCK: tl.constexpr):
+    offsets = tl.arange(0, BLOCK)
+    value = tl.load(X + offsets, offsets < N, other=-2147483648)
+    tl.store(Y, tl.argmax(value, axis=0, tie_break_left=True))
+
+
+@triton.jit
+def prefix_sum(X, Y, N, BLOCK: tl.constexpr):
+    offsets = tl.arange(0, BLOCK)
+    value = tl.load(X + offsets, offsets < N, other=0)
+    tl.store(Y + offsets, tl.cumsum(value, axis=0), offsets < N)
+
+
+@triton.jit
 def grid_ids(Y):
     x = tl.program_id(0)
     y = tl.program_id(1)
     nx = tl.num_programs(0)
     ny = tl.num_programs(1)
     tl.store(Y + x + nx * y, x + 100 * y + 10000 * nx + 1000000 * ny)
+
+
+@triton.jit
+def grid_ids_3d(Y):
+    x, y, z = tl.program_id(0), tl.program_id(1), tl.program_id(2)
+    nx, ny, nz = tl.num_programs(0), tl.num_programs(1), tl.num_programs(2)
+    tl.store(Y + x + nx * (y + ny * z), x + 10 * y + 100 * z + 1000 * nz)
 
 
 @triton.jit
@@ -138,3 +175,29 @@ def bf16_widen(X, Y, N, BLOCK: tl.constexpr):
     offsets = tl.arange(0, BLOCK)
     value = tl.load(X + offsets, offsets < N, other=0).to(tl.float32)
     tl.store(Y + offsets, value + 0.5, offsets < N)
+
+
+@triton.jit
+def indexed_copy(X, Index, Y, N, SCATTER: tl.constexpr, BLOCK: tl.constexpr):
+    offsets = tl.arange(0, BLOCK)
+    mask = offsets < N
+    index = tl.load(Index + offsets, mask=mask, other=0)
+    if SCATTER:
+        value = tl.load(X + offsets, mask=mask, other=0)
+        tl.store(Y + index, value, mask=mask)
+    else:
+        value = tl.load(X + index, mask=mask, other=0)
+        tl.store(Y + offsets, value, mask=mask)
+
+
+@triton.jit
+def sort_i32(X, Y, BLOCK: tl.constexpr):
+    offsets = tl.arange(0, BLOCK)
+    values = tl.load(X + offsets)
+    tl.store(Y + offsets, tl.sort(values, descending=True))
+
+
+@triton.jit
+def atomic_add_i32(Counter, Old, DELTA):
+    old = tl.atomic_add(Counter, DELTA, sem="relaxed", scope="gpu")
+    tl.store(Old, old)

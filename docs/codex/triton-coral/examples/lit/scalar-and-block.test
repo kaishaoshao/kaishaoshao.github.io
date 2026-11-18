@@ -1,0 +1,5 @@
+# RUN: %coral_python %S/../dump_ttir.py --frontend-target %coral_frontend --stage S2 --cumulative --case S0.frontend --case S1.empty.frontend --case S1.add --case S2.vector-add --output %t
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=EMPTY --input-file=%t/S1.empty.frontend.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=SCALAR --input-file=%t/S1.add.0.ttir
+# RUN: %coral_filecheck %S/../ir_checks.txt --check-prefix=VECADD --input-file=%t/S2.vector-add.0.ttir
+# RUN: %coral_triton_opt %t/S0.frontend.0.ttir -o %t/copy.verified.mlir

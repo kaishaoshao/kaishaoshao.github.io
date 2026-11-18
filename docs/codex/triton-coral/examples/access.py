@@ -20,6 +20,12 @@ def program_accesses(step, program):
     elif name in ("block_add", "block_select", "fp32_add"):
         indices = range(program[0] * k["BLOCK"], min((program[0] + 1) * k["BLOCK"], a["N"]))
         indices = list(indices); add("X", "read", indices); add("Y", "write", indices)
+    elif name == "vector_add":
+        first = program[0] * k["BLOCK"]
+        indices = range(first, min(first + k["BLOCK"], a["N"]))
+        add("X", "read", indices)
+        add("Y", "read", indices)
+        add("Z", "write", indices)
     elif name in ("masked_other", "bf16_widen"):
         add("X", "read", range(a["N"]))
         add("Y", "write", range(k["BLOCK"] if name == "masked_other" else a["N"]))
@@ -32,10 +38,28 @@ def program_accesses(step, program):
     elif name == "loop_sum":
         add("X", "read", [r * a["STRIDE"] + c for r in range(a["R"]) for c in range(a["N"])])
         add("Y", "write", range(a["N"]))
-    elif name in ("reduce_sum", "reduce_max"):
+    elif name in ("transpose_tile", "sort_i32", "prefix_sum"):
+        indices = range(a.get("N", len(step["buffers"]["X"]["values"])))
+        add("X", "read", indices)
+        add("Y", "write", indices)
+    elif name in ("reduce_sum", "reduce_max", "argmax_i32"):
         add("X", "read", range(a["N"])); add("Y", "write", [0])
     elif name == "grid_ids":
         add("Y", "write", [program[0] + step["grid"][0] * program[1]])
+    elif name == "grid_ids_3d":
+        nx, ny, _ = step["grid"]
+        x, y, z = program
+        add("Y", "write", [x + nx * (y + ny * z)])
+    elif name == "indexed_copy":
+        offsets = range(a["N"])
+        indices = step["buffers"]["Index"]["values"][:a["N"]]
+        add("Index", "read", offsets)
+        add("X", "read", offsets if k["SCATTER"] else indices)
+        add("Y", "write", indices if k["SCATTER"] else offsets)
+    elif name == "atomic_add_i32":
+        add("Counter", "read", [0])
+        add("Counter", "write", [0])
+        add("Old", "write", [0])
     elif name == "matmul_i8":
         rows = range(program[0] * k["BM"], min((program[0] + 1) * k["BM"], a["M"]))
         cols = range(program[1] * k["BN"], min((program[1] + 1) * k["BN"], a["N"]))

@@ -1,0 +1,40 @@
+// Use one prefix against the matching frontend sample/checkpoint, not all prefixes at once.
+// SCALAR: tt.func public @scalar_add
+// SCALAR: tt.load
+// SCALAR: arith.addi
+// SCALAR: tt.store
+
+// BLOCK: tt.func public @block_add
+// BLOCK-DAG: tt.get_program_id
+// BLOCK-DAG: tt.make_range
+// BLOCK-DAG: arith.cmpi
+// BLOCK: tt.load
+// BLOCK: tt.store
+
+// STRIDE: tt.func public @strided_bias
+// STRIDE-DAG: tt.expand_dims
+// STRIDE-DAG: tt.addptr
+// STRIDE: tt.store
+
+// LOOP: scf.for
+// LOOP: tt.load
+
+// WHILE: scf.while
+// WHILE: scf.if
+
+// REDUCE: "tt.reduce"
+
+// GRID-DAG: tt.get_program_id x
+// GRID-DAG: tt.get_program_id y
+// GRID-DAG: tt.get_num_programs x
+// GRID-DAG: tt.get_num_programs y
+
+// DOT: tt.dot
+
+// STRUCTURED: linalg.
+
+// FINALLLVM: target triple = "riscv32
+// FINALLLVM-NOT: tt.func
+// FINALLLVM-NOT: tts.
+// FINALLLVM-NOT: linalg.
+// FINALLLVM: define

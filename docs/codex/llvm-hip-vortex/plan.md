@@ -29,9 +29,9 @@
 | L01 | Clang 怎样认识 __global__？写出 store42 | 预处理与 AST，理解宏和属性 | T00.1；T07.2 的观察前置 |
 | L02 | 谁可以调用谁？<<<>>> 是什么？ | host/device 反例、CUDAKernelCallExpr | T07.2、T08.1 的观察前置 |
 | L03 | 设备函数怎样变成 RISC-V IR？ | 单线程 store42 的 IR 与缺失信息表 | T00.3、T03.5、T07.3 的前置 |
-| L04 | 哪一小段代码需要为 Vortex 增加？ | 新 LLVM 中 kernel 识别、设备配置与 driver 的最小切片 | T03.5、T07.1/T07.2；需要时引入 T01 |
-| L05 | 怎样让一个线程真的写回 42？ | 真实 ELF/vxbin、启动与参数桥接、SimX 输出 | T04 子项、T06 的 SDK 使用基础 |
-| L06 | threadIdx 从哪里来？扩为整块 vecadd | CSR/builtin、指令链路与多线程结果 | T01/T02/T03 子项、T07.3 |
+| L04 | 哪一小段代码需要为 Vortex 增加？ | kernel/设备连接，并开始后端 CPU/feature 与首条 TMC 的 MC 支持 | T03.5、T07.1/T07.2、T01 和 T02.3 的子项 |
+| L05 | 怎样让一个线程真的写回 42？ | ELF/vxbin、参数桥接、启动 TMC/WSYNC 路径与 SimX 输出 | T04 子项、T06 的 SDK 使用基础 |
+| L06 | threadIdx 从哪里来？扩为整块 vecadd | CSR/builtin、IR lowering 与多线程结果，复用标准算术 | T03 子项、T07.3；按需补 T01/T02 |
 | L07 | 加上 if(i<n) 为什么需要 SIMT？ | 分歧/汇合、循环、晚期分支与 N=37 结果 | T05；T02/T03 的必要补全 |
 | L08 | 如何把手工 host 变成普通 HIP 程序？ | API、参数自动打包、注册、<<<>>> 全链路 | T06/T07 剩余项、T08 |
 | L09 | 多个线程如何协作？做 reduction | shared、block barrier，再到 tiled SGEMM | T09 |
@@ -107,6 +107,10 @@ void launch(int* out) { store42<<<1,1>>>(out); }
 
 接下来按需要加入 mcpu=vortex 的默认设备配置和 HIP device-only driver 路由，让正常 driver 命令也能产生已观察到的设备 IR。每次只提交一个连接点；接受 CPU 参数、生成 IR 与生成可执行 kernel 分别验收。
 
+**本课就开始修改后端，不等完整 HIP frontend/runtime 做完。** 将本课拆成小节：先保留 kernel 信息，再建立 CPU/feature，随后添加首条 TMC 的 MC 支持。每小节是独立小提交；完整 driver 编排可以继续在后续课完善。
+
+第一条后端指令练习对应 T02.3：在 RISCV 扩展指令文件定义 `vx_tmc rs1`，接入 xvortex 谓词，核对固定字段，然后为汇编/反汇编/禁用 feature 添加测试。`vx_tmc a0` 的参考编码为 `0x0005000b`（小端字节 `0b 00 05 00`），核对方法见 [指令集章节](architecture.md#vortex-isa)。此时先不要求 Clang 为某段 C++ 自动生成它。
+
 ### L05：第一个可执行结果，只有一个线程
 
 保持 `store42(int* out)`，launch 限定一个 block、一个线程。这个范围可先绕开线程坐标和 lane 分歧，让问题集中在对象、链接、启动与参数上。
@@ -115,17 +119,39 @@ void launch(int* out) { store42<<<1,1>>>(out); }
 
 自己完成：把 out 的设备地址装入参数区，检查公共启动 PC/kernel PC/args，再在 SimX 读回 42。下一课保留这条启动链，只扩展线程计算。完整阶段出口仍需逐步替换手工桥接并回填 T04/T06 对应验收。
 
+store42 函数体只需要普通 RISC-V 运算/访存，专用指令来自执行环境：当前 startup 收尾使用 WSYNC 和 TMC。正式迁移时补齐其所需支持；若本课暂时复用参考 startup 或用现有 `.insn` 发出编码，应明确这是桥接/原始编码通路，不等于新后端已具备相应助记符、intrinsic 和自动生成能力。
+
 ### L06：把一个线程扩展成一组线程
 
 先让每个线程写自己的索引，再做无尾部判断的 vecadd，例如 N=32、block=8。此时引入 threadIdx/blockIdx/blockDim、CTA CSR 和 builtin，按需要补 CPU/features、intrinsic 与 MC 指令。
 
 自己完成：解释每个线程写哪里，验证 1D/2D 坐标和多 block，确保所选规模每个线程都访问合法范围。普通算术继续复用 RISC-V；不要为 vecadd 的加法单独发明 GPU 指令。
 
+threadIdx 的核心连接是 Vortex CTA CSR→设备 builtin/LLVM IR→标准 CSR 访问。它可以需要新增 CSR 名称、intrinsic 或 lowering，但不必新增一个“读取 threadIdx”的机器 opcode。将这类目标语义适配与 TMC 等自定义编码分开验收。
+
 ### L07：只加一个边界判断，学习 SIMT
 
 将输入改为 N=37，并增加 `if(i<n)`，使同一 warp 内同时有有效/越界 lane。由这个具体变化引出 divergence、active mask、split/join、汇合点和 uniformity。
 
 自己完成：先实现一个简单分支，再增加 if/else、嵌套、循环和提前退出。用哨兵验证无越界写入，保存 O0/O2 的 IR、MIR/汇编与结果；追查 select 等晚期展开是否产生额外分支。暂不支持的结构明确诊断，不能跳过转换后默默运行。
+
+本课补 SPLIT/JOIN（以及实际 lowering 需要的 SPLIT.N/PRED 等），并打通 intrinsic、指令选择和分歧转换。从源程序自动生成控制序列，是比 L04 的 MC 编码更高一层的目标。BAR 则在 L09 block 同步课引入；无需为了首个单线程结果提前搬入全部指令集。
+
+<a id="backend-timing"></a>
+
+### 后端修改与指令接入时点
+
+| 时点 | 后端工作 | 通过后能说明什么 |
+|---|---|---|
+| L01～L03 | 观察已有语法/IR；普通 store/add 先用现有 RISCV 能力 | 找到缺失连接，不要求新增指令 |
+| L04 | CPU/feature 最小配置；首条 TMC 的 MC 定义、编码和反汇编 | 新 LLVM 工具开始认识 Vortex 专用指令 |
+| L05 | startup 的 TMC/WSYNC、入口与参数；明确哪些组件仍复用 | 单线程执行链正确；复用部分不冒充已迁移 |
+| L06 | CTA CSR、builtins 与 IR lowering | 多线程标识和普通计算正确，不等于发明新算术 opcode |
+| L07 | SPLIT/JOIN 及必要控制变体、intrinsic 和 SIMT 变换 | 编译器能为已支持的分歧程序自动生成正确控制序列 |
+| L09 | BAR、共享内存与内存顺序约束 | 合法 block 协作与 barrier 语义正确 |
+| L10 | 匹配配置的原子/其他扩展 | 优先复用标准 A 扩展 lowering，不另造无必要的原子 opcode |
+
+同一条指令的验收依次区分：MC 定义/编码 → IR intrinsic/lowering → 编译器按程序语义自动生成 → SimX 执行正确。WSPAWN 是否需要取决于启动模型；当前 KMU 路径不能被简化成每次 HIP launch 插一条 WSPAWN。
 
 ### L08：让用户真正写普通 HIP 程序
 

@@ -29,6 +29,8 @@
 
 L08 的目标是由新 LLVM 编译带 `__global__`、`hipMalloc`、`hipMemcpy` 和 `<<<>>>` 的 vecadd/SAXPY，通过原生 runtime 在 SimX 正确执行；后续增加 reduction、tiled SGEMM，以及匹配配置下的 histogram 和 stream/event 依赖示例。
 
+后端从 L04 就开始改，第一条练习为 TMC 的 MC 支持；L07 再打通分歧控制指令的自动生成。具体时点与各层验收见 [后端接入表](plan.md#backend-timing)。
+
 认识设备指令时先读 [Vortex 指令集与 SIMT 执行模型](architecture.md#vortex-isa)：标准扩展、warp 控制、CSR、32 位编码与参考 llvm-mc 验证均在同一节持续维护。
 
 学到对应层次时查阅 [实现边界与契约](architecture.md#implementation-contracts) 及 [审阅/验收矩阵](plan.md#implementation-review)：两个 PC、SIMT、包装头/设备库、参数、错误和生命周期分别展开；第一课不要求先消化整个工程清单。

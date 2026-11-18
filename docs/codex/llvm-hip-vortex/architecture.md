@@ -81,6 +81,8 @@ CPU 的默认 feature 列表与 DefaultMarch 必须一致。初期选用可通�
 
 下表是工程能力与完整出口，授课顺序见 [plan.md 的十课主线](plan.md#tutorial-route)。教学从现有 HIP 语法/AST/Sema/IR 的隔离实验开始，按程序需要引入表中的连接点；mcpu=vortex 仍是目标配置，但不作为理解第一段 HIP 源码之前的实现前置。
 
+后端源码修改从 L04 开始，首条 MC 指令建议为 TMC；L05 核对启动所需 TMC/WSYNC，L06 接通 CSR，L07 处理 SPLIT/JOIN 与自动 SIMT lowering，L09 再实现 BAR。完整说明见 [接入时点表](plan.md#backend-timing)，不能把“语法优先”理解为把后端一直推迟到完整 HIP runtime 之后。
+
 | 阶段 | 核心问题 | 退出条件 |
 |---|---|---|
 | T00 | 环境和 ABI 基线是否清楚 | 新 LLVM 基础构建、参考执行与 ABI 分析 |

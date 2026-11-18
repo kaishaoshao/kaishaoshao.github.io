@@ -14,6 +14,8 @@
 
 ## 源码导航
 
+指令集入门先读 [架构方案第 6 节](architecture.md#vortex-isa)，其中包含当前标准扩展、自定义操作、CSR 与编码示例。它提供阅读材料，不改变现有任务 ID、状态或验收范围。
+
 本地路径前缀：LLVM=`/home/kaikai/vortex-word/llvm-project`，SDK=`/home/kaikai/vortex-word/vortex`，工作区=`/home/kaikai/vortex-word`。下表使用相对路径定位文件；链接指向固定参考代码。LLVM 23 目标源码与 Vortex 20 参考源码要对照阅读，不能混成一个版本。
 
 | 编号 | 阅读入口 | 关注内容 |
@@ -90,7 +92,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ### T01.1 写下 CPU、ISA、ABI 和设备边界
 
-- 目标/阅读：阅读 R9 的 ProcessorModel/DefaultMarch、架构方案和 T00 能力表。
+- 目标/阅读：阅读 R9 的 ProcessorModel/DefaultMarch、架构方案第 6.2 节的标准扩展配置和 T00 能力表。
 - 练习：定义名称 vortex、位宽、标准扩展、xvortex、基础 ABI、保守调度选择；列出 CPU 默认能力与可选配置。
 - 验收：明确 -mcpu 不表示源文件自动变成 HIP 或所有函数都变成 kernel；host x86 与设备 RV64 配置分开。
 - 交付/排查：CPU 契约与选项组合表。默认 ISA 不夹带当前 SimX 未启用的 A/C，不虚构精确性能参数。
@@ -136,7 +138,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ### T02.1 建立编码对照表
 
-- 目标/阅读：对照 R1 与 V1 的 TMC/SPLIT/JOIN/BAR 定义与解码。
+- 目标/阅读：先读架构方案第 6.6 节的位段与编码，再对照 R1 与 V1 的 TMC/SPLIT/JOIN/BAR 定义与解码。
 - 练习：列出 opcode/funct3/funct7、固定字段、可变寄存器；任选寄存器手算一条指令的 32 位编码。
 - 验收：TableGen、手算和执行端对字段的解释一致，明确输入/输出与隐含状态变化。
 - 交付/排查：编码表和手算过程；小端字节序与位字段书写顺序分别核对。

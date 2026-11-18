@@ -1,6 +1,6 @@
-# 第 1 课：Clang 怎样理解 HIP 语法
+# 第一阶段实验 1.1：Clang 怎样理解 HIP 语法
 
-更新日期：2026-11-18（Asia/Shanghai）。先从本课开始，课程目录见 [十课教学主线](plan.md#tutorial-route)。原有 T00 工程基线保留在本文件附录，不再是第一课的全部前置条件。
+更新日期：2026-11-18（Asia/Shanghai）。先从本实验开始，课程目录见 [六阶段教学主线](plan.md#tutorial-route)。原有 T00 工程基线保留在本文件附录，不再是第一课的全部前置条件。
 
 <a id="lesson-1"></a>
 
@@ -22,7 +22,7 @@ export HIP_TUTORIAL_CLANG=/home/kaikai/vortex-word/tools/llvm-vortex/bin/clang++
 mkdir -p artifacts/tutorial/l01
 ```
 
-这个路径是已安装的参考 Clang 20.1.8。第一至三课可先用它观察已有语法能力；你自己的 LLVM 23 构建完成后，修改 HIP_TUTORIAL_CLANG 指向新工具并重做实验。每次记录实际版本，不把参考工具结果写成新 LLVM 已通过。
+这个路径是已安装的参考 Clang 20.1.8。L01 的属性、语义/启动表达式和设备 IR 三个实验可先用它观察已有能力；你自己的 LLVM 23 构建完成后，修改 HIP_TUTORIAL_CLANG 指向新工具并重做实验。每次记录实际版本，不把参考工具结果写成新 LLVM 已通过。
 
 ## 写出最小程序
 
@@ -81,13 +81,13 @@ rg 'FunctionDecl|CUDADeviceAttr|CUDAGlobalAttr' \
 3. 用自己的话写出“宏 → 属性 → AST”三个层次，指出哪部分是 Clang 已有能力。
 4. 说明本课为什么没有证明 Vortex kernel 能在 SimX 运行。
 
-本课交付：最小输入、预处理结果、AST 摘要和上述回答。使用 [证据模板](evidence-template.md) 记录课程号 L01 和实际工具版本；关联任务只记录本课覆盖的部分，不自动把整个 T07 标为完成。
+本课交付：最小输入、预处理结果、AST 摘要和上述回答。使用 [证据模板](evidence-template.md) 记录“六阶段主线 L01/实验 1.1”和实际工具版本；关联任务只记录本课覆盖的部分，不自动把整个 T07 标为完成。
 
 ## 本课完成后
 
-进入 plan.md 中的 L02：先观察非法 host/device 调用，再看 <<<>>> 的 CUDAKernelCallExpr；L03 才观察设备 IR。到 L04 首次修改编译器之前，再完成必要的 LLVM 23 构建与基线核对。
+继续 plan.md 的 L01 实验 1.2：观察非法 host/device 调用与 <<<>>> 的 CUDAKernelCallExpr；再做实验 1.3 的设备 IR。到 L02 首次修改编译器之前，完成必要的 LLVM 23 构建与基线核对。L03 就执行 store42，L05 接通普通 HIP 流程，L06 开始已有程序移植。
 
-2026-11-18 已在参考 Clang 20.1.8 上核对本课的预处理与属性 AST，命令成功；也做了后续课的两个非法调用、launch AST 和设备 IR 隔离实验。记录详见 [课程证据边界](plan.md#03-已核对的教学实验与证据边界)。本课不包含新 LLVM 23 或新 SimX 执行通过记录。
+2026-11-18 已在参考 Clang 20.1.8 上核对本课的预处理与属性 AST，命令成功；也做了 L01 后续小实验中的两个非法调用、launch AST 和设备 IR 隔离实验。记录详见 [课程证据边界](plan.md#03-已核对的教学实验与证据边界)。本课不包含新 LLVM 23 或新 SimX 执行通过记录。
 
 <a id="engineering-baseline"></a>
 
@@ -234,4 +234,4 @@ bash scripts/validate-compiler.sh /home/kaikai/vortex-word/build/llvm
 - [ ] evidence.md 包含版本、ABI 链路、参数布局和七个问题的回答。
 - [ ] 能清楚说明“本任务还没有为 LLVM 23 添加 Vortex/HIP 实现”。
 
-附录完成后按 [课程主线](plan.md#tutorial-route) 继续。CPU、指令和 ABI 仍要实现，但按 L04～L07 的程序演进逐步引入；T01～T10 是工程验收分组，不要求为了开始学习语法就先完成整个 CPU 或指令阶段。
+附录完成后按 [课程主线](plan.md#tutorial-route) 继续。CPU、指令和 ABI 仍要实现，但按 L02～L04 的程序演进逐步引入；T01～T10 是工程验收分组，不要求为了开始学习语法就先完成整个 CPU 或指令阶段。

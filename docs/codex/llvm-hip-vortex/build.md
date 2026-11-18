@@ -2,7 +2,7 @@
 
 源码目录：`/home/kaikai/vortex-word/llvm-project`。
 
-学习路线已改为 [从语法到执行的十课教程](plan.md#tutorial-route)。L01～L03 可以先用已安装参考 Clang 做观察，不必等待完整 LLVM 构建；L04 修改源码前需构建 LLVM 23，并重跑前面的观察实验。参考编译器和新编译器的证据分开记录。
+学习路线已改为 [从 store42 到已有 HIP 程序的六阶段教程](plan.md#tutorial-route)。L01 的三个前端实验可以先用已安装参考 Clang 做观察，不必等待完整 LLVM 构建；L02 修改源码前需构建 LLVM 23，并重跑前面的观察实验。参考编译器和新编译器的证据分开记录。
 
 本地分支 `dev/vortex` 基于 LLVM 官方 tag `llvmorg-23.1.4`，基线提交为 `7a941dfb2877a0b8cf30323fefa85ad019e0b0f5`。`origin` 保留为 `git@github.com:Learn-Compiler/llvm-project.git`；`upstream` 是官方 `https://github.com/llvm/llvm-project.git`。
 

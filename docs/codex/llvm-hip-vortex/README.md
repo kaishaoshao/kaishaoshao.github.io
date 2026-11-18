@@ -13,9 +13,9 @@
 | 文件 | 内容 |
 |---|---|
 | [architecture.md](architecture.md) | 架构、CPU/ISA/ABI 职责、选项组合、指令集、实现边界与冻结点 |
-| [plan.md](plan.md) | 从语法到执行的十课主线、源码分析、工程分组与最终成果 |
+| [plan.md](plan.md) | 从 store42 到已有 HIP 程序的六阶段主线、源码分析、工程分组与最终成果 |
 | [tasks.md](tasks.md) | 保留的 66 项工程验收任务及课程映射，不作为入门阅读顺序 |
-| [getting-started.md](getting-started.md) | 第 1 课的可执行命令；附录保留 T00 构建/ABI 基线 |
+| [getting-started.md](getting-started.md) | 第一阶段的属性/AST 实验命令；附录保留 T00 构建/ABI 基线 |
 | [build.md](build.md) | 现有 LLVM 分支和 build.sh 的使用说明 |
 | [compiler-sim-contract.md](compiler-sim-contract.md) | 编译产物、两个启动 PC、native/HIP 参数布局与 SimX 的接口 |
 | [evidence-template.md](evidence-template.md) | 任务记录与验证证据模板 |
@@ -23,19 +23,19 @@
 
 ## 学习顺序与最终成果
 
-`L01 语法/AST → L02 语义/启动表达式 → L03 设备 IR → L04 最小编译器改动 → L05 单线程 SimX → L06 多线程/builtins → L07 分歧控制流 → L08 HIP 全链路 → L09 block 协作 → L10 扩展与交付`
+`L01 HIP 前端 → L02 Vortex 编译入口 → L03 store42 执行 → L04 带边界 vecadd → L05 普通 HIP 全链路 → L06 已有程序移植`
 
-先做 [第 1 课](getting-started.md#lesson-1)，再按 [十课课程](plan.md#tutorial-route) 一次推进一个程序变化。每课包含问题、最小输入、机制、命令、自己完成的小改动和验收；原有 T00～T10/66 项作为工程账本保留状态。
+先做 [第一阶段的属性/AST 实验](getting-started.md#lesson-1)，再按 [六阶段教程](plan.md#tutorial-route) 一次推进一个程序变化。每阶段拆成多个实验和小提交；原有 T00～T10/66 项作为工程账本保留状态。旧课程记录按 plan.md 第 0.4 节映射，不重写原有通过证据。
 
-L08 的目标是由新 LLVM 编译带 `__global__`、`hipMalloc`、`hipMemcpy` 和 `<<<>>>` 的 vecadd/SAXPY，通过原生 runtime 在 SimX 正确执行；后续增加 reduction、tiled SGEMM，以及匹配配置下的 histogram 和 stream/event 依赖示例。
+L03 就在 SimX 读回 store42 的 42（允许明确标记的教学桥接）；L05 由新 LLVM 自动编译并通过原生 runtime 执行普通 HIP vecadd；L06 移植固定来源的已有 HIP 程序。shared、原子、stream/event 等按目标程序需要补齐，不是首个移植结果的全部前置。
 
-后端从 L04 就开始改，第一条练习为 TMC 的 MC 支持；L07 再打通分歧控制指令的自动生成。具体时点与各层验收见 [后端接入表](plan.md#backend-timing)。
+后端从 L02 就开始改，第一条练习为 TMC 的 MC 支持；L04 接通线程标识和必要的分歧控制自动生成。具体时点与各层验收见 [后端接入表](plan.md#backend-timing)。
 
 认识设备指令时先读 [Vortex 指令集与 SIMT 执行模型](architecture.md#vortex-isa)：标准扩展、warp 控制、CSR、32 位编码与参考 llvm-mc 验证均在同一节持续维护。
 
 学到对应层次时查阅 [实现边界与契约](architecture.md#implementation-contracts) 及 [审阅/验收矩阵](plan.md#implementation-review)：两个 PC、SIMT、包装头/设备库、参数、错误和生命周期分别展开；第一课不要求先消化整个工程清单。
 
-完整 HIP 兼容、RV32、跨文件 device linking、真实硬件部署和大型应用移植属于后续专题。计划中的“能够支持”与已记录的“实际通过”分别维护。
+完整 HIP 兼容、RV32、跨文件 device linking、真实硬件部署和更大型应用移植属于后续专题；首个已有小程序的移植在 L06 开始。计划中的“能够支持”与已记录的“实际通过”分别维护。
 
 ## 使用与维护
 

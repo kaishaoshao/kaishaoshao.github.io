@@ -186,6 +186,8 @@ warp 内 lane 标识与 CTA 中的 threadIdx 坐标是不同概念。block 可�
 
 CTA 身份/维度与活跃 mask 的变化规律不同。优化时要按真实生命周期选择可合并/可提升的读取，并将 threadIdx 等分歧来源传给分析；不能把所有 CSR 读取统一标成纯函数或 uniform。
 
+CTA 坐标/维度在一次 CTA 执行内稳定，warp slot 复用或不同 launch 后可改变；不能跨这些边界把读取值缓存为全局常量。
+
 ### 6.6 编码长什么样
 
 核心 warp 控制操作使用 CUSTOM0，opcode 为 `0x0b`。以下只列 `funct7=0` 的一组操作；其他 funct7 或其他 CUSTOM 编码空间还承载其他扩展。
@@ -234,6 +236,8 @@ printf 'vx_tmc a0\nvx_split a1,a0\nvx_join a1\nvx_bar a0,a1\n' |
 
 参考 LLVM 的单个 td 文件并不覆盖 SDK/设备源码中的全部操作。SDK 可以用 `.insn` 直接发出合法编码，因此“设备能执行”“SDK 有包装”“llvm-mc 认识助记符”“Clang 能从 builtin/IR 生成”要分别验收。LLVM 23 的 xvortex 支持范围必须明确列出，未实现能力应诊断或记录为限制。
 
+`.insn` 本身是原始编码出口。其接受输入不能证明该指令适合当前设备，也不能替代具名助记符/IR 路径的 feature 负例测试。
+
 ### 6.8 对本教程任务的影响
 
 - T01：用标准扩展与 xvortex 定义 CPU 的默认能力，固定 ABI/ISA 选择规则。
@@ -243,3 +247,89 @@ printf 'vx_tmc a0\nvx_split a1,a0\nvx_join a1\nvx_bar a0,a1\n' |
 - T09/T10：单独验证 block 同步与原子等能力；vote/shuffle、矩阵等未纳入主线子集的能力按专题扩展，不因本节介绍而自动扩大 66 项的完成承诺。
 
 阅读顺序为配置→SDK 包装→SimX 解码→RTL 解码/执行→LLVM 定义与 pass。某层只识别编码，另一层负责分析与生成，迁移时要保持两端契约一致。
+
+<a id="implementation-contracts"></a>
+
+## 7. 实现前要固定的边界与契约
+
+2026-11-18 审阅补充。本节细化现有 66 项任务的设计与验收，不表示这些功能已实现，也不重置任务状态。具体参数例子和两个启动 PC 见 [编译器与 SimX 契约](compiler-sim-contract.md)。
+
+### 7.1 固定 host/device 平台与第一版子集
+
+第一版 host 明确为 **WSL 中的 x86_64 Linux**，设备为 **RV64、little-endian、lp64d 的裸机目标**。LLVM 构建目标 X86 不能代替具体 host triple/ABI 记录；Windows 原生 host、RV32 与跨平台 ABI 兼容另行验证。
+
+| 项目 | T08 最小闭环的约定 | 后续范围 |
+|---|---|---|
+| 设备与编译单元 | 单设备、一个 HIP 翻译单元、多个 kernel、重复启动 | 多设备与跨文件 device linking 另设专题 |
+| 参数 | 设备指针、int32/uint32/int64/uint64、float，按设备布局打包 | bool、long double、任意按值结构/类、非平凡对象不自动纳入 |
+| 设备函数 | 普通算术与已验证控制流，初期优先内联 helper | 非内联调用在 T05.5 单独验收；递归、虚调用、间接调用未承诺 |
+| 设备 C++ 运行时 | 不以异常、RTTI、设备 malloc/printf、动态构造对象为前置 | 每类能力增加设备库与生命周期测试后再开放 |
+| 存储 | 显式分配的设备 buffer；明确的私有栈 | shared 在 T09，managed memory、复杂全局对象另行实现 |
+| stream | 初版只支持约定的 legacy 默认 stream | per-thread default stream 先拒绝；显式 stream 与默认流交互在 T10 定义 |
+| 优化 | 正确性验收覆盖 O0/O2，先使用 SelectionDAG 路径 | GlobalISel、LTO、fast-math 与性能调优另行验证 |
+
+不支持的行为应尽早诊断；尚未实现诊断的限制必须写入支持矩阵，不能宣称任意 HIP/C++ 输入都可用。设备 printf、全局构造函数等不能仅因参考 libc/startup 中有代码就算已兼容。
+
+### 7.2 HIP 头文件和设备库需要独立处理
+
+“Clang 已能解析 HIP”不等于所有默认 HIP 头文件都适用于 RISC-V。LLVM 23 的 [__clang_hip_runtime_wrapper.h](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.4/clang/lib/Headers/__clang_hip_runtime_wrapper.h) 会引入 libdevice、数学和标准库支持，还包含与 OCKL 等外部符号相关的分支；迁移时需要审查它和相关包装头。
+
+初版建议维护精简的 Vortex HIP 支持头/声明，在 T06.1 开始实现公开 runtime API 前固定所参考的 HIP 公共接口版本，保留 Clang 的真实 host/device/global 属性语义。T07.2 再交付设备头文件/宏/隐式 include/设备库清单；未使用的 AMD/NV/SPIR-V 依赖不能意外泄漏到 Vortex 设备 IR 和链接中。
+
+精简支持范围不等于任意改变公开枚举、错误码或结构体 ABI。公共结构体应采用固定版本的完整声明，或初期只提供明确的标量能力查询；不能缩短 hipDeviceProp_t 等布局后宣称可与任意现有 HIP 客户端二进制互换。
+
+host 的 C++ 系统头、设备 sysroot 和 baremetal 库分别配置。先允许复用固定参考版本的设备 ELF 静态库，但每个库都记录来源、ISA/ABI 和实际链接路径。不能把 LLVM 20 的设备 bitcode、AMDGPU device library 或宿主 libstdc++ 二进制当作天然兼容 LLVM 23/RISC-V；需要 bitcode 时按新编译器重新构建并检查。
+
+### 7.3 SIMT 转换是必需语义，不能只挂在优化流水线
+
+T03/T05 应写出 pipeline 不变量：在分歧分析前，线程标识与 private load 等语义可见；转换后，mask/token 和汇合结构仍成立。LLVM 23 的 IR 分析/转换与机器 pass 按实际接口接入，不能只换旧版注册宏。
+
+O0 的 optnone/优化跳过规则不能跳过必要的 SIMT lowering；O2 后续 CFG 变换也不能破坏已经生成的结构。测试 pass 是否会漏跑、重复运行是否安全，并保存关键阶段 IR。遇到不支持或超过复杂度限制的 CFG，不能仅跳过 lowering 后继续生成可能错误的程序。
+
+内联、非内联调用、每线程栈/alloca、PHI、不同循环退出路径分别验证。convergent、side effects 和 memory effects 各自有含义，不能靠统一添加一个属性替代正确的流水线与内存语义。
+
+现有 SDK common.mk 默认使用 O3；已有 validate-compiler.sh 复用该配置，不能自动算作 O0/O2 验收。任务测试需提供明确模式，并记录实际 clang 命令中最终生效的 -O 选项。
+
+### 7.4 内存、地址空间和参数不能混为一种布局
+
+设备指针在参数区中是 64 位设备地址；host 的 void** args 是每个参数值的 host 地址列表。参数描述需要区分 pointer/scalar，不能按值是否落在地址范围内猜类型。偏移与对齐由设备 DataLayout/所定序列化契约决定，不能直接沿用宿主 sizeof 一个任意结构体。
+
+global/private/shared 的语义、LLVM 地址空间数值、指针宽度、允许的转换与 alias 规则应形成表格，T07.3/T09.1 分别冻结并验证。不要直接照搬 AMDGPU 地址空间编号或 kernel calling convention；初版优先复用已验证的 RISC-V 普通函数调用约定，加 Vortex kernel wrapper。
+
+shared memory 总量为静态资源与动态请求按约定布局后的大小；检查对齐、加法和 grid/block 乘法溢出。warpSize、maxThreadsPerBlock 等来自能力查询或明确的编译假设，不硬编码为常见 GPU 的 32/64 或 256。若设备库把某个配置编成常量，镜像需记录该假设并在加载/启动时检查。
+
+### 7.5 公开 HIP API 与隐式编译器 ABI 分开验收
+
+| 接口层 | 最小需要固定的行为 | 对应任务 |
+|---|---|---|
+| 设备与错误 | 单设备查询/选择子集、能力、错误码与 hipGetErrorString | T06.1 |
+| 内存 | hipMalloc/hipFree、同步 H2D/D2H/D2D，范围与生命周期 | T06.2～T06.3 |
+| 同步与 launch 错误 | hipDeviceSynchronize、hipGetLastError/hipPeekAtLastError 的选定契约 | T06.6、T08.4 |
+| 隐式 ABI | 镜像注册/注销、函数注册、配置压栈/出栈、host stub 调用签名 | T08.1～T08.4 |
+
+`<<<>>>` 语法本身不返回一个可直接检查的 hipError_t。运行时必须区分可立即发现的启动参数错误和需要同步才能报告的执行错误；错误状态不能用一个无条件共享的全局变量代替所选 host 线程语义。正式样例检查公开 API 和启动后的错误，避免失败后继续读取未定义输出。
+
+参考 [HIP 错误处理说明](https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_runtime_api/error_handling.html)：GetLastError 读取并清除，PeekAtLastError 读取而不清除；哪些 API 结果写入 last-error 状态还需固定参考版本，因为该行为存在版本差异。实现时记录具体版本，而不是只写“兼容最新 HIP”。
+
+注册构造函数可能在 main 之前执行。初版可先登记镜像与 kernel 描述，按需要延迟初始化设备/加载模块；明确构造、首次使用、在途任务与退出注销的所有权，不依赖不同全局构造函数的偶然顺序。
+
+### 7.6 同步、原子和异步的完成标准
+
+T09 的 barrier 测试同时覆盖 shared 和 block 内 global 数据的写入→同步→互读，以及循环中多轮同步。按 [HIP 同步语义](https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_cpp_language_extensions.html#synchronization-functions) 验证执行汇合、可见性和编译器重排约束；非法分歧 barrier 程序不作为要求得到确定结果的用例。
+
+T10 原子先限定实际支持的类型、作用域和顺序，不把一次 AMO 生成等同于全部 HIP/C++ 原子语义。原子性和更强的内存顺序分别测试；不从竞争计数正确推出所有数据发布顺序都正确。修改 A 等配置后，还要核对缓存/内存路径及编译对象要求。
+
+异步接口要写明 host 内存条件、阻塞回退、参数快照时机、buffer/module 保活和销毁等待。正确的 event 依赖可以在串行模拟器中验证；同时运行与性能提升属于另一个结论。
+
+### 7.7 尚需在任务中冻结的设计项
+
+| 设计项 | 最晚冻结任务 | 所需产物 |
+|---|---|---|
+| xvortex 版本、CPU 默认 ISA、ABI 与配置要求 | T01.6 | 选项/能力矩阵 |
+| native 启动 PC、kernel PC、参数指针与库边界 | T04.1～T04.4 | ELF/启动/镜像契约与实物检查 |
+| HIP 公共 API 参考版本、设备包装头和库策略 | 公共声明在 T06.1，设备部分在 T07.2 | 版本/依赖/声明清单 |
+| 地址空间与参数格式、入口 wrapper | T07.3～T07.4 | 逐字段布局与 host/device 对照 |
+| Clang 23 隐式 host ABI、镜像容器与错误行为 | T08.1～T08.4 | host IR、注册表和运行记录 |
+| shared/barrier 与 atomic/stream/event 的支持子集 | T09.1、T10.2～T10.5 | 语义表和有区分力的执行测试 |
+
+这些待冻结项是任务交付要求，不是当前已经确定所有格式或实现细节。验收时应回填实际选择与证据，继续在本文件和现有任务卡原地更新。

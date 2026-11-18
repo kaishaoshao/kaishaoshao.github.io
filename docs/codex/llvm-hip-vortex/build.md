@@ -61,3 +61,13 @@ bash scripts/validate-compiler.sh "$PWD/build/llvm"
 ```
 
 验证记录：2026-11-17 已通过 Bash 语法检查、CMake 配置与 Ninja dry-run（包含四个后端、Clang、LLD、llc、llvm-config）。本次没有执行完整 LLVM 编译。
+
+## 验收范围与实际编译选项
+
+LLVM 工具的 Release 构建类型与被测 kernel 的 -O 级别是两件事。固定 SDK 的 regression/common.mk 默认给设备代码使用 O3，validate-compiler.sh 会复用它；该脚本通过不能直接写成 O0/O2 都通过。后续按任务单独选择模式并保存真实编译命令，尤其核对最后生效的 -O、target-cpu、features、ABI 与 sysroot。
+
+先以 SelectionDAG 为本教程代码生成路径。GlobalISel、LTO、fast-math 和完整设备库不是首个闭环的必要条件；如果命令启用了未验收路径，应诊断或在支持矩阵中明确限制。
+
+该验证脚本还会复用参考版本的 LLD、打包器与设备静态库。即使 build.sh 构建出了新 LLD，也不能据此宣称验收已使用它。host 为 WSL x86_64 Linux，device 为 RV64 baremetal；分别记录工具路径、头文件/sysroot 与链接库，避免意外引入宿主库。
+
+完整设计与检查项见 [实现契约](architecture.md#implementation-contracts) 和 [验收矩阵](plan.md#implementation-review)。这些是后续任务要求，本次没有重新执行完整构建或 SimX smoke。

@@ -35,6 +35,8 @@
 - 新增测试验证什么错误：
 - 中间 IR/汇编/ELF/vxbin/host 产物的路径与来源：
 
+涉及 ABI 或运行时时补充：program_pc/kernel_pc/args 地址、参数 kind/offset/size/alignment、元数据版本、静态/动态共享内存、资源持有和释放时机。涉及 pipeline 时注明 O0/optnone 是否运行必需转换，以及保存了哪些前后 IR。
+
 ## 验证记录
 
 逐个填写实际执行的命令。不要将设计中的命令写成已经执行，也不要用“构建成功”替代执行语义验证。

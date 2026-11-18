@@ -22,7 +22,7 @@
   → Vortex module / queue / buffer API → SimX → CPU 参考结果校验
 ```
 
-第一版完成以下子集：RV64、单设备、默认 stream、单源文件、多次 kernel 启动、`int`/`float` 运算、设备指针与固定宽度标量参数、`__global__`、`threadIdx`/`blockIdx`/`blockDim`/`gridDim`、`<<<>>>`、分配/拷贝/同步/释放。这里的完成标准是端到端正确执行，不是“能生成汇编”。
+第一版完成以下子集：x86_64 Linux host、RV64 device、单设备、约定的 legacy 默认 stream、单源文件、多次 kernel 启动、`int`/`float` 运算、设备指针与固定宽度标量参数、`__global__`、`threadIdx`/`blockIdx`/`blockDim`/`gridDim`、`<<<>>>`、分配/拷贝/同步/释放和启动错误检查。这里的完成标准是端到端正确执行，不是“能生成汇编”。详细支持边界见 [实现契约](architecture.md#implementation-contracts)。
 
 共享内存、barrier、原子、多个 stream 按后续任务增加。RV32、设备动态并行、跨文件 device linking、完整数学库、纹理、WMMA、PyTorch/ROCm 库兼容不作为第一版目标。先选一种优化流水线和指令选择路径验证，不同时承诺 SelectionDAG 与 GlobalISel。
 
@@ -184,11 +184,11 @@ SDK [vortex2.h](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8
 
 建议每次只推进一个任务：你先给出方案或 patch，我围绕官方代码解释其作用、检查语义与测试漏洞，再进入下一步。错误优先按 host/runtime → 参数与入口 ABI → IR/SIMT → ISA 编码 → simulator 配置定位；具体排查顺序按证据调整，不把所有失败归到指令选择。
 
-每个小任务的记录可从 [证据模板](evidence-template.md) 复制。任务状态只有“待做、进行中、待评审、通过、受阻”；所有任务初始为待做，现有参考环境通过记录不自动算作新后端任务完成。记录里注明新编译器、参考编译器、预编译库各自负责的部分。
+每个小任务的记录可从 [证据模板](evidence-template.md) 复制。任务状态只有“待做、进行中、待评审、通过、受阻”；任务初始为待做，后续以用户进度和实际证据为准，不因文档修订重置。现有参考环境通过记录不自动算作新后端任务完成。记录里注明新编译器、参考编译器、预编译库各自负责的部分。
 
 ## 6. 最后可以做成什么样子
 
-### 6.1 三个可运行里程碑
+### 6.1 目标选择与可运行里程碑
 
 | 完成位置 | 你做出的东西 | 可以演示的程序 | 结论边界 |
 |---|---|---|---|
@@ -207,6 +207,14 @@ T09 完成后增加静态/动态 shared memory、block barrier、跨 warp reduct
 #include <hip/hip_runtime.h>
 #include <cstdio>
 
+#define HIP_CHECK(call) do {                                      \
+  const hipError_t error = (call);                                \
+  if (error != hipSuccess) {                                      \
+    std::fprintf(stderr, "%s: %s\n", #call, hipGetErrorString(error)); \
+    return 1;                                                    \
+  }                                                              \
+} while (false)
+
 __global__ void vecadd(const float* a, const float* b, float* c, int n) {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i < n)
@@ -215,34 +223,36 @@ __global__ void vecadd(const float* a, const float* b, float* c, int n) {
 
 int main() {
   constexpr int n = 37;
-  float a[n], b[n], c[n];
+  float a[n], b[n], c[n] = {};
   for (int i = 0; i < n; ++i) {
     a[i] = float(i);
     b[i] = float(2 * i);
   }
   float *da = nullptr, *db = nullptr, *dc = nullptr;
-  // 示例省略逐次错误检查；正式验收用例必须检查所有 API 返回值。
-  hipMalloc(reinterpret_cast<void**>(&da), sizeof(a));
-  hipMalloc(reinterpret_cast<void**>(&db), sizeof(b));
-  hipMalloc(reinterpret_cast<void**>(&dc), sizeof(c));
-  hipMemcpy(da, a, sizeof(a), hipMemcpyHostToDevice);
-  hipMemcpy(db, b, sizeof(b), hipMemcpyHostToDevice);
+  HIP_CHECK(hipMalloc(reinterpret_cast<void**>(&da), sizeof(a)));
+  HIP_CHECK(hipMalloc(reinterpret_cast<void**>(&db), sizeof(b)));
+  HIP_CHECK(hipMalloc(reinterpret_cast<void**>(&dc), sizeof(c)));
+  HIP_CHECK(hipMemcpy(da, a, sizeof(a), hipMemcpyHostToDevice));
+  HIP_CHECK(hipMemcpy(db, b, sizeof(b), hipMemcpyHostToDevice));
   constexpr int block = 8; // 符合当前配置；正式运行先查询设备限制。
   vecadd<<<(n + block - 1) / block, block>>>(da, db, dc, n);
-  hipDeviceSynchronize();
-  hipMemcpy(c, dc, sizeof(c), hipMemcpyDeviceToHost);
+  HIP_CHECK(hipGetLastError());
+  HIP_CHECK(hipDeviceSynchronize());
+  HIP_CHECK(hipMemcpy(c, dc, sizeof(c), hipMemcpyDeviceToHost));
   bool ok = true;
   for (int i = 0; i < n; ++i)
     ok = ok && (c[i] == a[i] + b[i]);
-  hipFree(da);
-  hipFree(db);
-  hipFree(dc);
+  HIP_CHECK(hipFree(da));
+  HIP_CHECK(hipFree(db));
+  HIP_CHECK(hipFree(dc));
   std::puts(ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;
 }
 ```
 
 目标是用户写标准 HIP 子集源码，不再手动编写 `kernel_arg_t`、入口 alias、`.vxbin` 打包命令或 Vortex host launch。编译链自动完成这些步骤，runtime 在配置好的 SimX 环境执行。
+
+示例遇到错误即返回非零；完整失败路径的资源回收还要通过 T06/T08 的生命周期测试。它要求 runtime 提供 launch 错误状态，不能仅以所有 API 都返回成功来通过。这个目标示例尚未由新后端编译执行。
 
 拟定用户界面可以是 `hipcc-vortex vecadd.hip -o vecadd`，随后运行 `./vecadd`；这里的 `hipcc-vortex` 是 T08/T10 中待设计的入口脚本名称，不是当前已有命令。底层 Clang 应能通过 `-###` 显示真实 host/device jobs，方便你调试，而不是把工作全部隐藏在脚本里。
 
@@ -259,3 +269,30 @@ int main() {
 ### 6.4 主线结束后的专题
 
 以下不计入 66 个主线任务，可按实际需求继续拆解：设备数学库与更多类型；复杂 C++/按值结构体 ABI；跨翻译单元 device linking；常量/全局对象；warp/subgroup 操作；RV32；真实硬件部署；性能优化与大型 HIP 应用移植。每个专题都应先定义支持子集，再增加源码、负例和执行测试。
+
+<a id="implementation-review"></a>
+
+## 7. 开发前审阅结论与验收矩阵
+
+审阅日期：2026-11-18。主线架构继续采用 RISCV Target + mcpu=vortex；本轮完善边界、依赖与测试，不新增任务编号或后端实现。P0 表示对应里程碑通过前必须解决，P1 表示该能力引入时落实。
+
+| 优先级 | 原有不足/需要确认的细节 | 本轮补充与必须交付的证据 | 对应任务 |
+|---|---|---|---|
+| P0 | 顶部旧注释仍描述不同的启动模型 | 分开 program_pc/kernel_pc/args，按实际代码、DCR、ELF 核对；两个 kernel 交替启动 | T04.1～T04.6 |
+| P0 | 单看入口 alias 或文件存在不足以证明可执行 | 验证公共入口、镜像基址、BSS 范围、入口表和 CTA slot 复用 | T04.2～T04.6 |
+| P0 | O0 必需转换与优化 pipeline 的关系不具体 | optnone 下不漏跑 SIMT；O2 后不破坏 mask/CFG；失败有最小 IR | T03.1、T05.1～T05.5 |
+| P0 | 头文件和设备库依赖未独立列出 | 公开 API 实现前固定 HIP 声明版本，再审查 runtime wrapper/math/stdlib、sysroot 和库来源 | T06.1、T07.2、T07.5 |
+| P0 | 参数打包缺少可逐字节复核的实例 | vecadd 建议 32 字节布局、kind/offset/align、wrapper 和版本化描述匹配 | T07.3～T07.4、T08.4 |
+| P0 | 公开 API 与隐式 host ABI 边界不足 | 从 host IR 提取实际符号/签名；固定 dim3/stream/默认流模式与注册时序 | T08.1～T08.4 |
+| P0 | 最小样例没有检查 launch 与同步错误 | 加入错误状态 API；正式样例逐次检查，错误不能静默当成功 | T06.6、T08.4～T08.6 |
+| P0 | 框架可配置能力容易被当成固定 GPU 参数 | 查询真实 warp/block/shared 限制；检查溢出、形状和编译时假设 | T01.6、T06.1、T06.5 |
+| P1 | private/global/shared 与 helper 调用边界未冻结 | 地址空间/转换/alias 表；private 栈及非内联调用测试；unsupported 清单 | T05.5、T07.3、T09.1 |
+| P1 | barrier 只看指令存在会遗漏内存可见性 | shared/global 互读、多 warp、多轮 barrier 与重排测试 | T09.4～T09.6 |
+| P1 | 原子、异步接口的名称容易代替语义验收 | atomicity/order/scope 分开；buffer/module/host 参数生命周期和 event 依赖 | T10.2～T10.5 |
+| P1 | 调试和复现证据的格式不统一 | 保存实际 clang jobs、IR/ELF/map、链接来源和配置；区分静态检查/参考执行/新后端执行 | 各阶段、T10.6 |
+
+更详细的冻结点见 [架构实现契约](architecture.md#implementation-contracts)，启动与参数例子见 [compiler-sim-contract.md](compiler-sim-contract.md)。
+
+审阅建议的先后顺序是：先冻结 native 启动与 ABI，验证一个可运行切片，再完善 SIMT；进入 HIP 前确定头文件/设备库/参数格式；接 host stub 时同时做错误与资源生命周期测试。共享内存、原子及异步继续按既有阶段增加，不把可选能力提前变成首个闭环的必要前置。
+
+本轮文档审阅不等于矩阵各项已通过。源码核对、布局检查、参考工具结果和实际新后端执行分别记录，后续直接回填现有任务证据。

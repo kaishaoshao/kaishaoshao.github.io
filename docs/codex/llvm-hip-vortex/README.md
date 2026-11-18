@@ -12,12 +12,12 @@
 
 | 文件 | 内容 |
 |---|---|
-| [architecture.md](architecture.md) | 架构、CPU/ISA/ABI 职责、选项组合、源码落点及 Vortex 指令集 |
+| [architecture.md](architecture.md) | 架构、CPU/ISA/ABI 职责、选项组合、指令集、实现边界与冻结点 |
 | [plan.md](plan.md) | 官方源码分析、11 阶段路线、里程碑、最终程序和支持边界 |
 | [tasks.md](tasks.md) | 66 个详细任务：阅读、练习、验收、交付与排查 |
 | [getting-started.md](getting-started.md) | T00 基线任务的具体命令和 ABI 阅读练习 |
 | [build.md](build.md) | 现有 LLVM 分支和 build.sh 的使用说明 |
-| [compiler-sim-contract.md](compiler-sim-contract.md) | 编译产物、启动、参数布局与 SimX 的接口 |
+| [compiler-sim-contract.md](compiler-sim-contract.md) | 编译产物、两个启动 PC、native/HIP 参数布局与 SimX 的接口 |
 | [evidence-template.md](evidence-template.md) | 任务记录与验证证据模板 |
 | [AGENTS.md](AGENTS.md) | 本主题的原地维护、状态保留和提交规则 |
 
@@ -28,6 +28,8 @@
 先阅读架构和计划，再按 tasks.md 一次推进一个小任务。完成 T08 后的目标是由新 LLVM 编译带 `__global__`、`hipMalloc`、`hipMemcpy` 和 `<<<>>>` 的 vecadd/SAXPY，通过原生 runtime 在 SimX 正确执行；后续增加 reduction、tiled SGEMM，以及匹配配置下的 histogram 和 stream/event 依赖示例。
 
 认识设备指令时先读 [Vortex 指令集与 SIMT 执行模型](architecture.md#vortex-isa)：标准扩展、warp 控制、CSR、32 位编码与参考 llvm-mc 验证均在同一节持续维护。
+
+开始编码前核对 [实现边界与契约](architecture.md#implementation-contracts) 及 [审阅/验收矩阵](plan.md#implementation-review)：重点是两个 PC、O0 必需转换、HIP 包装头/设备库、参数打包、错误处理和资源生命周期。
 
 完整 HIP 兼容、RV32、跨文件 device linking、真实硬件部署和大型应用移植属于后续专题。计划中的“能够支持”与已记录的“实际通过”分别维护。
 

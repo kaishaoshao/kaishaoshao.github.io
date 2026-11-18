@@ -1,6 +1,6 @@
 # 编译器输出与 SimX 的接口
 
-当前固定为 Vortex 3.0、RV64、默认硬件配置。
+当前固定为 Vortex 3.0、RV64、默认硬件配置。2026-11-18 按固定 SDK `26d2bc4b5409a35a111e8316ac3a87d07b15fc80` 的实现补充本契约；以下区分现有 native ABI 与拟定 HIP 参数格式。
 
 ```text
 你的 LLVM
@@ -67,3 +67,57 @@ bash scripts/validate-compiler.sh /你的LLVM构建或安装目录
 每次生成新的 `build/compiler-check.XXXXXX`，防止复用旧 kernel 导致假通过。被测 clang++ 编译 kernel 和启动代码；参考工具链提供已有 device runtime、LLD、打包与反汇编工具。它验证设备编译接入，不证明整个 runtime 已由新 LLVM 重编，也不证明完整 HIP 兼容。
 
 后续应自行扩展分歧分支、共享内存 reduction、barrier、原子操作和更多 host/runtime 验收用例。
+
+## 两个 PC 与真实启动路径
+
+固定 SDK 的 [queue.cpp](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/sw/runtime/common/queue.cpp) 分别设置程序启动地址和选中 kernel 的函数地址。不能只把符号表里查到的函数地址作为整个程序的启动地址。
+
+| 值 | 当前实现如何使用 |
+|---|---|
+| program_pc / STARTUP_ADDR | 模块镜像基址；warp 从公共启动代码开始 |
+| kernel_pc / KERNEL_ENTRY | 选中 kernel 的函数入口，通过 CTA_ENTRY CSR 提供 |
+| args_addr / STARTUP_ARG | 设备侧参数区地址，通过 MSCRATCH CSR 提供 |
+
+当前 `KMU_ENABLE` 路径中，`_start` 与 `__vx_cta_entry` 位于公共入口，建立栈等状态后读取 CTA_ENTRY 到 s11、MSCRATCH 到 a0，再间接调用 kernel；随后执行收尾的 wsync/tmc。后续 CTA 对 warp slot 的复用还依赖固定 dispatch window，不能随意改变其指令长度或插入代码。
+
+同一 [vx_start.S](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/sw/kernel/src/vx_start.S) 的顶部旧注释以及部分设计说明仍描述每 kernel 两指令 stub；实际生效代码已使用分离的启动 PC/kernel PC。遇到这种差异，以固定提交的代码、生成 ELF 和 runtime 写入的 DCR 三方核对，不能单独照抄旧注释。参考入口 pass 生成的 alias 指向函数 body；alias 本身不负责建立栈。
+
+T04 的检查要覆盖 `_start`/公共入口、镜像 min_vma 和 runtime program_pc 的一致性，kernel alias/导出名/kernel_pc 的一致性，以及 `a0` 的参数指针。用两个计算结果不同的 kernel 交替启动、多 block 和多轮 CTA slot 复用检验，不只验证单个首次 launch。
+
+## native vxbin 与 HIP 元数据的边界
+
+现有 [vxbin.py](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/sw/kernel/scripts/vxbin.py) 输出两项 little-endian u64 地址边界、镜像 payload 和可选 VXSYMTAB footer。max_vma 覆盖 `_end` 等运行时范围；文件 payload 长度不能直接当作完整设备内存占用。
+
+VXSYMTAB 提供名称和入口 PC，不包含 HIP 参数类型/对齐/偏移信息。T07 可先在设备镜像旁保存易检查的参数描述，T08 再把镜像与描述封装到 host 容器；保持两阶段同一版本契约。原型优先沿用 SDK vxbin loader，不为添加 HIP 参数表就同时修改其文件格式和调度 ABI。
+
+## HIP 参数布局示例（拟定契约，待实现）
+
+以 `vecadd(const float* a, const float* b, float* c, int32_t n)` 为例：设备指针宽 8 字节，int32_t 宽 4 字节，按自然对齐并将参数区尾部补齐至最大对齐，建议布局如下。实际生成器和 wrapper 必须根据目标 DataLayout/冻结的序列化规则验证。
+
+| 参数 | 种类 | 字节数 | 对齐 | 偏移 |
+|---|---|---|---|---|
+| a | 设备地址 | 8 | 8 | 0 |
+| b | 设备地址 | 8 | 8 | 8 |
+| c | 设备地址 | 8 | 8 | 16 |
+| n | int32 标量 | 4 | 4 | 24 |
+| 尾部填充 | 置零 | 4 | — | 28 |
+
+总大小 32 字节、对齐 8。它与 demo 的 40 字节参数结构是两份不同契约，不能直接互换。
+
+2026-11-18 用参考 Clang 20.1.8、`--target=riscv64-unknown-elf -march=rv64imafd -mabi=lp64d` 对对应自然 C++ 结构做了 sizeof/alignof/offsetof 静态断言，32/8 字节及 0/8/16/24 偏移检查通过。这只核对参考目标的数据布局，不代表 LLVM 23 的参数生成器、wrapper 或端到端执行已完成。
+
+host launch 的参数数组保存 `&da、&db、&dc、&n`，runtime 从这些 host 地址分别读取参数值，写入目标参数区。指针参数写入的是 da/db/dc 的设备地址值；不会把 `&da` 等 host 地址传给设备，也不能直接复制整个 void** 数组作为设备参数。wrapper 接收单一参数区指针，从规定偏移解包并调用 kernel 实现。
+
+最小元数据需明确：格式版本、kernel 标识和入口、每参数的 kind/size/alignment/offset、总大小和对齐、所需 ISA/ABI、静态共享内存与必要编译假设。对未知版本、参数数量不符、越界或重叠布局、超限资源有明确错误；不能依赖“碰巧和 host sizeof 相同”。
+
+## 提交时机、快照与对象生命周期
+
+固定 queue.cpp 在 `enqueue_launch` 时复制参数 blob，并 retain kernel 以保活其模块；这只涵盖该接口约定。HIP runtime 仍需保证在调用时正确复制参数值、在执行期间保活参数中引用的设备 buffer，并按契约处理 free/unload。不能把参数 blob 已复制等同于全部资源都已保活。
+
+runtime 检查 grid/block 非零、checked 乘法、实际支持的 block 形状及资源上限；当前默认每 Core 4 warp × 4 thread 给出 16-thread 的 block 容量。shared 请求要合并静态和动态区域；不忽略 padding、溢出或能力查询失败。
+
+最终还需核对新 ELF 与参考静态库的 ISA/ABI、实际使用的链接器、relocation/code model、数据/BSS/栈/TLS 和 compiler-rt 来源。当前参考 Makefile 使用 medany、裸机静态链接路径、禁用 RTTI/异常等选项；新 Clang 不能意外引入 host Linux crt、动态装载器或不匹配的设备库。
+
+## 本节补充的证据边界
+
+2026-11-18 对 queue.cpp、vx_start.S、vxbin.py 与 common.mk 做了源码核对。本节的 HIP 参数格式为教程设计，尚未由新 LLVM 生成；启动、生命周期和负例测试是后续验收要求。本次审阅没有新增 SimX 执行通过记录，也没有改动 SDK/编译器实现。

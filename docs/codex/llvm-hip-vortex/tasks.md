@@ -1,6 +1,6 @@
 # LLVM 23 HIP/Vortex：66 个主线任务卡
 
-更新日期：2026-11-18（Asia/Shanghai）。配套总览：[教程与最终成果](plan.md)。所有任务初始状态均为“待做”，由你实现；本文件是任务设计，不是已完成清单。
+更新日期：2026-11-18（Asia/Shanghai）。配套总览：[教程与最终成果](plan.md)。本文件是任务设计，不是已完成清单；任务进度以实际证据为准，文档修订不重置既有状态。
 
 本修订按 [CPU/subtarget 架构方案](architecture.md) 重排：新增 T01 专门实现 `-mcpu=vortex`，原 T01～T09 顺延为 T02～T10。共 11 个阶段、66 个任务，旧的 T00 基线编号保持不变。
 
@@ -11,6 +11,8 @@
 每个任务都提交：① 用自己的话解释设计；② 实际修改或分析产物；③ 输入、命令、预期/实际结果；④ 涉及哪些参考组件；⑤ 一个失败/错误行为的解释。使用 [证据模板](evidence-template.md)。源码任务应有检验语义的测试；纯阅读任务用分析表/执行证据验收，不为凑数量编写测试。
 
 验收分层：MC 编码测试不能替代 SIMT 执行测试，IR 检查不能替代参数 ABI 验证，SimX 执行成功不能替代 host 注册与资源生命周期检查。暂不支持的输入应有明确诊断或限制，避免静默误编译。
+
+本轮审阅补充的契约见 [架构方案第 7 节](architecture.md#implementation-contracts) 与 [启动/参数契约](compiler-sim-contract.md)。下面新增的验收细节保留全部 66 个任务 ID；已经有执行证据的任务只需复核新增条件，不重新标成待做。优先补齐两个 PC、O0 必需转换、HIP 包装头/设备库和参数布局，再扩展功能。
 
 ## 源码导航
 
@@ -177,6 +179,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：生成对象再反汇编，覆盖四条指令、CPU 默认与显式 feature 通路、feature 关闭、非法操作数和普通 RISC-V 回归。
 - 验收：编码/反汇编往返一致；测试断言关键字段和诊断，不依赖无关格式。
 - 交付/排查：完整 MC 切片证据与评审 diff。反汇编器未开 feature 时可能显示未知编码，和汇编拒绝分别验收。
+- 补充验收：区分具名指令/IR 的 feature 负例与 `.insn` 原始编码出口；原始字节能被汇编器写出不表示其在目标设备上合法。
 
 ## 阶段 T03：IR、CSR、uniformity 与 Clang feature
 
@@ -188,6 +191,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：为最小控制/标识 intrinsic 列类型、宽度、副作用、memory effects、convergent 与可优化条件。
 - 验收：可解释哪些操作可公共子表达式消除、哪些不能删除/跨控制流移动；参考属性也需审查。
 - 交付/排查：语义表与属性设计，不机械把全部 CSR 读取标成相同纯度。
+- 补充验收：写出 pointer/整数宽度、convergent 与访存约束各自的理由；检查 O0/optnone 下必需语义仍保留，不只依赖优化运行。
 
 ### T03.2 实现 intrinsic 到指令的选择
 
@@ -202,6 +206,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：接通 threadIdx/blockIdx/blockDim/gridDim 所需最小能力，审查 X/Y/Z 与返回值宽度。
 - 验收：IR/汇编访问正确 CSR，不把 warp 内 lane ID 直接当完整 CTA threadIdx；执行坐标验证在 T04 完成。
 - 交付/排查：builtin/CSR 对照表和 CodeGen 测试；不要混用旧运行模型的编号。
+- 补充验收：同模块使用不同 grid/block 维度重复启动时，CTA 坐标/维度按当前执行上下文读取，不跨 CTA/launch 缓存为全局常量。
 
 ### T03.4 识别分歧来源
 
@@ -235,6 +240,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 设备配置检查：回填 T01.6 的 kernel 上下文用例，缺少必需 xvortex 能力时明确诊断，不因 CPU 名仍为 vortex 就继续生成不兼容 kernel。
 - 验收：host 写入布局与 device 读取布局逐字段一致，设备地址不等于 host 指针。
 - 交付/排查：带版本的 ABI 说明；后续 HIP wrapper 以此为设备入口契约。
+- 补充交付：记录程序启动 PC、kernel 函数 PC 与参数地址三项，及 x86_64 Linux host / RV64 lp64d device、code model、库来源和地址空间约定。
 
 ### T04.2 迁移 kernel entry alias 生成
 
@@ -242,6 +248,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：按 LLVM 23 API 实现入口生成，处理重复执行、无 annotation、多个 kernel。
 - 验收：只对标记函数生成稳定 alias；重复运行不重复创建，未标记函数不被误注册。
 - 交付/排查：IR pass 测试；alias 生成成功后仍需在链接产物验证未被删除。
+- 补充核对：固定 SDK 实际采用公共 startup 与 CTA_ENTRY 的分离路径；不能依据旧注释把函数 alias 当作每 kernel 启动 stub。
 
 ### T04.3 接入 startup 与链接布局
 
@@ -249,6 +256,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：使用新 compiler 处理启动/设备对象，复用已固定库与链接脚本，记录每项来源。
 - 验收：ELF 为正确 RV64 可执行文件；入口、段地址、栈、a0 和间接调用约定匹配执行端。
 - 交付/排查：ELF/map/反汇编；先查链接地址与缺失符号，再归因到设备执行。
+- 补充验收：公共入口与镜像基址/runtime program_pc 一致，kernel_pc 独立指向选中函数；检查 CTA slot 复用依赖的 dispatch window，不任意改变其长度。
 
 ### T04.4 检查 vxbin 与 kernel 表
 
@@ -256,6 +264,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：对链接 ELF 打包，核对 kernel_main→main 映射、入口地址和镜像内存范围。
 - 验收：镜像通过结构检查，模块可找到指定 kernel；错误文件和缺失 kernel 有可解释失败。
 - 交付/排查：格式检查记录；不要把 .o 重命名为 .vxbin，或只验证文件存在。
+- 补充验收：镜像 payload 与含 BSS 的运行时范围分别检查；现有 VXSYMTAB 只有名称/PC，HIP 参数描述另有版本契约，不假定 footer 已携带它。
 
 ### T04.5 在 SimX 执行首个 kernel
 
@@ -270,6 +279,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：重新生成产物复跑 demo，尝试适用的 native sgemm 接入，保存支持范围与失败分层方法。
 - 验收：能从命令证明 kernel 来自 LLVM 23；符合本阶段约束的用例稳定通过，非目标能力明确记录。
 - 交付/排查：M1 报告。复用参考 runtime 要明示；不能把旧 kernel 或参考 compiler 的产物当新后端结果。
+- 补充验收：用不同结果的两个 kernel 交替启动，并覆盖多轮 CTA slot 复用；区分默认 O3 接入脚本与另行控制的 O0/O2 测试。
 
 ## 阶段 T05：SIMT 分歧与重新汇合
 
@@ -281,6 +291,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：画出参考 pass 的输入/输出与依赖；对照 LLVM 23 说明 IR pass 和后端 pipeline 如何接入。
 - 验收：能指出 pass 前后必须成立的不变量，解释为何不能随便换顺序；普通 RISC-V 有关闭保护。
 - 交付/排查：迁移设计与阶段 IR 样例；legacy/new pass manager 的适配按实际流水线处理，不机械替换类名。
+- 补充验收：必需转换在 O0/optnone 下仍运行；pass 重跑与后续 CFG 优化有不变量检查，复杂度退出不能静默留下错误 SIMT 程序。
 
 ### T05.2 处理最简单的分歧 if
 
@@ -309,6 +320,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：构造带普通 load/store、PHI、内联 helper 的分歧用例，比较 O0/O2；测试非内联调用是否在支持范围。
 - 验收：优化未错误移动/合并 lane 控制和访存；受支持调用保留语义，未实现的分歧跨函数调用明确拒绝或列入限制。
 - 交付/排查：优化差异与最小回归用例；不能通过永久关闭所有优化来宣告 O2 支持。
+- 补充用例：private 栈/alloca 的地址与值分类、内联与不内联 helper、分歧路径上的提前退出；未支持的递归/间接调用需列明限制。
 
 ### T05.6 通过尾部边界与控制流套件
 
@@ -327,6 +339,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：建立独立 runtime 的最小构建，封装单设备初始化/关闭、能力查询、公开错误码与错误字符串。
 - 验收：初始化成功与不可用设备失败均可解释；查询结果用于检查 block/内存/ISA 限制，避免硬编码所有设备相同。
 - 交付/排查：接口边界、构建说明与初始化测试；HIP 子集头文件需保证约定签名与 ABI。
+- 补充交付：先固定 HIP 公共 API 参考版本，再列明 hipGetDeviceCount/GetDevice/SetDevice/能力查询及 hipGetErrorString 子集；公开枚举/结构布局保持该版本约定，单设备以外请求不静默接受，不硬编码 warpSize=32/64。
 
 ### T06.2 实现分配、释放与设备地址映射
 
@@ -362,6 +375,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：组合完整分配→拷贝→启动→等待→读回→释放，覆盖中途失败和多次重复；补 hipDeviceSynchronize 的约定。
 - 验收：成功/失败路径不遗漏自己创建的资源；在途任务所需对象保持有效；默认 stream 范围写明。
 - 交付/排查：runtime smoke 与资源所有权表。多设备/多 stream 不在此阶段的实现承诺中。
+- 补充契约：定义 hipGetLastError/hipPeekAtLastError 的记录/读取/清除及 host 线程行为，区分立即参数错误和同步报告的执行错误；在途 free/unload 不破坏引用。
 
 ## 阶段 T07：HIP device-only 编译
 
@@ -380,6 +394,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：提供所需的 dim3、函数属性和设备声明，验证 __global__/__device__/__host__、host/device 调用限制。
 - 验收：合法 kernel 与 helper 可分析，非法 host/device 调用有诊断；不依赖 AMD 特定头文件假设生成目标代码。
 - 交付/排查：Sema/头文件测试；仅用宏把 __global__ 擦掉不算完成 HIP frontend。
+- 补充交付：沿用 T06.1 固定的 HIP 公共声明版本，审计 Clang 隐式 runtime wrapper、数学/stdlib 头和设备库；禁止未说明/未实现的 AMD/NV 设备调用、宿主库或不匹配的旧 bitcode 依赖。
 
 ### T07.3 映射 HIP builtins 与设备地址语义
 
@@ -387,6 +402,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：接通 HIP thread/block/dimension，明确 global/private 指针和 DataLayout 的选择，检查分歧分析能看见来源。
 - 验收：X/Y/Z 对应正确，设备指针运算与 RV64 地址宽度一致；生成 IR 不残留错误 AMD/NV 特定依赖。
 - 交付/排查：HIP→IR/汇编测试及地址空间表；语言地址空间编号与实际硬件存储语义不可混淆。
+- 补充交付：global/private/shared 的语义、LLVM 数值映射、宽度/对齐、转换和 alias 规则；kernel wrapper 与普通 helper 的调用约定分开说明。
 
 ### T07.4 设计参数元数据与 kernel wrapper
 
@@ -394,6 +410,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：限定指针/int32/uint32/int64/uint64/float 参数，定义版本化偏移/大小/对齐元数据，生成单参数区入口 wrapper。
 - 验收：wrapper 按相同布局解包并调用 HIP 实现；混合参数顺序、padding、两个签名和零参数 kernel 有用例。
 - 交付/排查：ABI 文档和 IR/布局测试；void** 只提供值的位置，不能替代类型布局元数据。
+- 补充验收：逐字节验证 [vecadd 的建议 32 字节参数区](compiler-sim-contract.md) 及不同签名；检查 pointer/scalar kind、尾部 padding、元数据版本与错误布局。示例数值需由真实目标 DataLayout/生成器再次确认。
 
 ### T07.5 构建设备链接与打包 jobs
 
@@ -401,6 +418,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：为 device-only 路径连接编译、startup/库链接与 vxbin 打包；限定单翻译单元，保留可检查中间产物。
 - 验收：-### 与实际执行一致，device ELF/镜像可检查；缺失链接器/设备库能报告准确错误。
 - 交付/排查：driver 测试与完整产物链；不要只改 IR triple 而沿用错误设备 ABI/库。
+- 补充验收：保留参数元数据并与设备镜像/入口匹配；记录 sysroot、libc、compiler-rt、LLD 的实际来源，检查最终 ELF 未引入 host crt/动态装载器。
 
 ### T07.6 执行 HIP device-only kernel
 
@@ -419,6 +437,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：以最小 HIP 输入检查 host IR，列出所有隐式外部符号、函数签名、dim3 传递与调用次序。
 - 验收：清单与实际 IR 一致，区分公开 API 与编译器 ABI；头文件、CodeGen 与 runtime 原型相同。
 - 交付/排查：host ABI 表与 IR 测试，特别核对默认 stream 选项，不能只凭函数名实现。
+- 补充验收：dim3/size_t/stream 与函数原型来自同一套声明；明确只支持约定的默认流模式，per-thread 默认流不能被静默忽略。
 
 ### T08.2 封装并嵌入设备镜像
 
@@ -433,6 +452,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：实现 host function/stub 标识→设备入口/参数表的映射，处理 C++ 名字、同模块多个 kernel 和注销。
 - 验收：两个不同签名 kernel 不混淆，重复注册策略明确，未注册 kernel 有错误，卸载不会破坏在途执行。
 - 交付/排查：注册表测试与全局生命周期图；host 函数地址不是可直接交给设备执行的地址。
+- 补充用例：命名空间中同 basename 的不同 kernel 不碰撞；注册发生在 main 前、首次使用和退出注销时，不依赖其他全局构造顺序。
 
 ### T08.4 接通启动配置与参数打包
 
@@ -440,6 +460,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：由实际 host ABI 取得 grid/block/sharedMem/stream 与 void** args，按元数据复制值并提交 kernel。
 - 验收：指针、32/64 位标量、float、零参数及多次启动正确；参数区在异步提交后仍有效，非法启动返回明确错误。
 - 交付/排查：参数布局与启动测试；host 局部变量生命周期和 SDK staging 行为必须查清。
+- 补充验收：SDK 在 enqueue_launch 复制 blob 不等于 HIP 参数里的所有 buffer 已保活；超限/溢出的 grid/block/shared 请求和 launch 错误能被公开错误 API 观察。
 
 ### T08.5 实现一体编译入口
 
@@ -454,6 +475,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：运行整除/非整除 vecadd、SAXPY、两个不同签名 kernel 连续启动，覆盖反复分配释放与错误返回。
 - 验收：用户不手工写 native 参数区/打包命令；LLVM 23 生成设备代码，经原生 runtime 在 SimX 正确执行，O0/O2 结果合格。
 - 交付/排查：M3 报告、支持 API/参数/控制流矩阵和复现命令。仍复用的设备库单独列出，现有 chipStar 测试不冒充此结果。
+- 补充验收：正式样例检查每次 API、launch 后的错误及同步错误；检查 host/device 目标、元数据/镜像对应和所用优化模式。
 
 ## 阶段 T09：shared memory 与 block 同步
 
@@ -486,6 +508,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：接通 block barrier，审查 compiler memory effects、调度约束与所需 fence/等待机制，明确本阶段保证的可见性范围。
 - 验收：多个 warp 写共享数据→同步→互读正确，O2 也不越过 barrier 错误重排；循环中多轮 barrier 正确。
 - 交付/排查：同步契约与执行/优化回归。所有参与线程必须满足约定的收敛条件，不要求保证非法分歧 barrier 程序有确定结果。
+- 补充用例：除 shared 外，验证 block 内 global 数据写入→barrier→互读；分别审查硬件等待、cache/fence 路径和编译器重排。
 
 ### T09.5 运行跨 warp reduction
 
@@ -518,6 +541,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 练习：先定义目标 HIP atomicAdd 的作用域/顺序契约，实现需要的设备 builtin/lowering，检查 AMO 及必要顺序机制。
 - 验收：高竞争计数和 histogram 与 CPU 参考一致，O0/O2 重复通过；不支持的宽度/类型有明确限制。
 - 交付/排查：原子契约、汇编和执行测试；普通 load+store 在单次测试正确也不能作为原子实现。
+- 补充验收：把原子性、内存顺序和作用域分开；只对所承诺的顺序增加可区分用例，不把 atomicAdd 等同于全设备同步。
 
 ### T10.3 支持 stream 与队列内顺序
 

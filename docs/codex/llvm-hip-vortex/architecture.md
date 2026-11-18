@@ -333,3 +333,33 @@ T10 原子先限定实际支持的类型、作用域和顺序，不把一次 AMO
 | shared/barrier 与 atomic/stream/event 的支持子集 | T09.1、T10.2～T10.5 | 语义表和有区分力的执行测试 |
 
 这些待冻结项是任务交付要求，不是当前已经确定所有格式或实现细节。验收时应回填实际选择与证据，继续在本文件和现有任务卡原地更新。
+
+### 7.8 审查指令选择之后新增的分歧
+
+IR 中的 select 可能在后端展开成机器级分支。LLVM 23 的 [RISCVISelLowering.cpp](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.4/llvm/lib/Target/RISCV/RISCVISelLowering.cpp) 中，本地基线的 `emitSelectPseudo` 路径会创建 MachineBasicBlock、条件分支和 PHI。因此 IR 阶段的 SIMT 转换完成后，还要检查 SelectionDAG、custom inserter、伪指令展开及后续 CFG 处理是否引入了需要 mask/汇合管理的新分支。
+
+这是一项迁移风险，不是已经证实官方 Vortex 编译器存在错误。需要追踪原实现如何处理这些情况，再选择目标约束、无分支 lowering 或机器级处理；不能先假定所有普通 RISC-V lowering 都适合 SIMT。
+
+T03.6/T05.5 至少检查整数/浮点条件选择、嵌套 select，以及实际会触发展开或 helper 的支持内运算；同时检查 Zicond 能解决哪些类型、哪些情况仍会走其他路径。保存 MIR/最终汇编，并用同一 warp 内不同条件的 lane 执行比较。机器验证器通过只证明相应结构约束，不证明 SIMT 语义正确。
+
+### 7.9 执行推进、故障和恢复能力分别定义
+
+普通 kernel 不能依赖所有 block 同时驻留，单个 warp 也不能默认具有其他 GPU 的独立线程推进语义。初版不承诺跨 block 自旋构造的全局 barrier、依赖同 warp 不同分支独立推进的锁算法或 cooperative grid 同步。合法的 block 内 barrier 和普通循环仍需正确完成；不能把所有超时都归因于用户算法。
+
+故障通道同样要按实际后端区分。固定 SDK 的 [SimX core.cpp](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/sim/simx/core.cpp) 部分 issue-timeout 路径打印 PC、warp、mask 和等待信息后调用 abort；这类故障未必能返回到 HIP API。[queue.cpp](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/sw/runtime/common/queue.cpp) 中的队列错误/等待超时则有自己的返回路径，二者不能混同。
+
+初版逐项列出：可由 API 返回的参数/队列错误、同步才能观察的错误，以及会终止进程的后端故障。测试用子进程和有界 watchdog 保存退出码/信号、超时与日志；超时只是未完成的证据，仍需定位原因。进程隔离、设备/context 恢复另行设计，不能声称已经具备完整 HIP 故障恢复能力，也不自动重试可能已经修改数据的 kernel。
+
+### 7.10 将版本兼容与产物身份分开记录
+
+| 版本/身份 | 描述什么 | 需要匹配的两端 |
+|---|---|---|
+| xvortex ISA 版本与所需 features | 指令编码和执行能力 | 编译器与 SDK/SimX/硬件 |
+| native kernel ABI 与固定 SDK 提交 | startup、两个 PC、参数指针和基础调用规则 | 设备镜像与 loader/调度端 |
+| HIP 参数描述/容器版本 | 参数布局、资源要求、镜像封装 | 编译器生成器与 host runtime |
+| Clang 隐式 host ABI / HIP 公共声明版本 | 注册、stub、公开函数和结构声明 | host 编译、头文件与 runtime |
+| 具体构建指纹 | 编译选项、头/库来源和配置假设 | 本次测试及其输入产物 |
+
+不能只用一个 xvortex 版本号代表上述全部兼容性。第一版可继续使用固定 SDK 的原生 vxbin 格式，把 HIP 版本信息放在外层描述/容器，避免同时更改设备 loader。
+
+调试闭环优先使用新生成的设备镜像。以后若增加设备产物缓存，缓存键要覆盖编译器修订、有效选项、相关头/库、ISA/ABI 和元数据版本；源文件名或时间戳不足以标识可执行结果。T10.6 报告应能从 host 程序追到嵌入镜像和生成命令，防止运行旧产物后误判新后端通过。

@@ -38,6 +38,8 @@ python3 "$VORTEX_DOCS_ROOT/examples/run_l01.py" \
 
 检查脚本保存输入副本、SHA-256、完整命令、stdout/stderr、IR 和 report.json；每次创建独立目录。它检查七项前端观察（包括版本），两个反例应由编译器拒绝；只有诊断内容也匹配才算该反例通过。脚本通过不证明任何设备执行能力。
 
+<a id="l01-attributes"></a>
+
 ## 实验 1.1：宏和 AST
 
 输入是 [attributes.hip](examples/l01/attributes.hip)：
@@ -145,7 +147,7 @@ store42 的函数体只做一次普通 store，本来不必出现 SPLIT/JOIN。�
 
 保存本次输出，并使用 [证据模板](evidence-template.md) 写下你的解释。run_l01.py 的 PASS 是观察检查通过；整个课程交付还包含阅读与回答，不能自动完成 T00/T07/T08 整组。
 
-下一步进入 [L02](plan.md#l02)：先用已有源码定位 target CodeGen 的扩展点，再为逻辑 HIP kernel 设计最小标记及正/反例。基础 CPU/feature 和首条 MC 指令按小提交推进。
+下一步按 L02 的小阶段学习。先对照 kernel/helper 设计逻辑标记。已开始写 feature 的话，可并行做 L02.3 的目标选择检查。[标记设计](plan.md#l02-1) · [CPU 与 feature](plan.md#l02-3)
 
 已记录的历史实验见 [证据与进度](plan.md#03-已核对的教学实验与证据边界)。2026-11-19 新增标准夹具在 Clang 23.1.4 和参考 Clang 20.1.8 各执行一次，七项观察检查全部通过；没有运行新后端设备镜像。
 

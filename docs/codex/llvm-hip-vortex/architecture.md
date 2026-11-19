@@ -260,7 +260,7 @@ printf 'vx_tmc a0\nvx_split a1,a0\nvx_join a1\nvx_bar a0,a1\n' |
     -triple=riscv64 -mattr=+xvortex -show-encoding
 ```
 
-这项记录只证明参考 llvm-mc 对四条输入的编码结果；没有证明 LLVM 23 已迁移这些指令，也没有新增 SimX 执行通过记录。
+这项记录覆盖参考 llvm-mc 对四条输入的编码。2026-11-19 又核对了 TMC 的两个寄存器和反汇编，发现参考工具在 `-mattr=-xvortex` 下仍接受 `vx_tmc`。在新 LLVM 上单独检查编码、feature 诊断和执行。[TMC 小阶段](plan.md#l02-4)
 
 ### 6.7 可选扩展与工具链覆盖
 

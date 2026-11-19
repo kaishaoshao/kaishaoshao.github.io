@@ -13,7 +13,7 @@
 | 文件 | 内容 |
 |---|---|
 | [architecture.md](architecture.md) | 架构、CPU/ISA/ABI 职责、选项组合、指令集、实现边界与冻结点 |
-| [plan.md](plan.md) | 从 store42 到已有 HIP 程序的六阶段主线、源码分析、工程分组与最终成果 |
+| [plan.md](plan.md) | 六个大阶段与 28 个小阶段，含各步目标、测试、实现注意点和源码入口 |
 | [tasks.md](tasks.md) | 保留的 66 项工程验收任务及课程映射，不作为入门阅读顺序 |
 | [getting-started.md](getting-started.md) | 完整 L01：属性/AST、调用反例、启动表达式与设备 IR；附录为 T00 |
 | [build.md](build.md) | 区分 LLVM 与 Vortex 两个 build.sh，工具状态、构建与验证范围 |
@@ -36,7 +36,7 @@
 
 `L01 HIP 前端 → L02 Vortex 编译入口 → L03 store42 执行 → L04 带边界 vecadd → L05 普通 HIP 全链路 → L06 已有程序移植`
 
-先做 [第一阶段实验](getting-started.md#lesson-1)，再按 [六阶段教程](plan.md#tutorial-route) 一次推进一个程序变化。每阶段写明问题、输入、源码、操作、观察、失败定位与出口，拆成多个小提交；原有 T00～T10/66 项作为工程账本保留状态。旧课程记录按 plan.md 第 0.4 节映射，不重写原有通过证据。
+先看六个大阶段的目标和验收，再打开要做的小阶段。每个小阶段先说明目标，再列出测试输入、预期信号和实现注意点。完成后按覆盖范围回填原有 T00～T10 的 66 项工程任务。[大阶段目标与验收](plan.md#stage-goals) · [工程任务账本](tasks.md#task-dependencies)
 
 L03 就在 SimX 读回 store42 的 42（允许明确标记的教学桥接）；L05 由新 LLVM 自动编译并通过原生 runtime 执行普通 HIP vecadd；L06 移植固定来源的已有 HIP 程序。shared、原子、stream/event 等按目标程序需要补齐，不是首个移植结果的全部前置。
 

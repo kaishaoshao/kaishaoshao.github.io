@@ -14,8 +14,8 @@
 
 每个开发增量按下面六步完成：
 
-1. **读源程序**：在 [kernels.py](examples/kernels.py) 中找到本阶段 kernel，说明参数、数据类型、索引、mask 和预期输出。一次先处理一个操作或一种组合。
-2. **读测试**：在 [suite.py](examples/suite.py) 中查看同名阶段的输入、独立参考、边界和负例。132 个用例按阶段逐步启用，不要求先实现全部能力。
+1. **读源程序**：从[阶段文件表](#阶段文件)找到本阶段 kernel，说明参数、数据类型、索引、mask 和预期输出。一次先处理一个操作或一种组合。
+2. **读测试**：在 `stage_cases/` 的对应文件中查看输入、独立参考、边界和负例。132 个用例按阶段逐步启用。
 3. **生成真实 TTIR**：运行 [dump_ttir.py](examples/dump_ttir.py)，找出当前尚未支持的操作、类型或循环状态，记录准备如何保持其语义。
 4. **补齐表示和 lowering**：普通算术和控制流使用标准方言；二维结构化访存需要时接入 TTS/Linalg；调度、存储和 tile 分别在 S6/S7/S8 引入自定义语义。每次转换都配 verifier 和对应 IR 检查。
 5. **接通真实执行**：实现当前阶段所需的编译/运行适配器，生成真实 ELF，装载到 Coral，使用独立参考检查结果、边界和执行轨迹。
@@ -75,8 +75,9 @@
 
 | 文件 | 内容 | 能证明什么 |
 | --- | --- | --- |
-| [kernels.py](examples/kernels.py) | 24 个逐步增加语法的真实 Triton kernel | 可供前端检查和后端实现使用的源程序 |
-| [suite.py](examples/suite.py) | 每阶段输入、constexpr、grid、独立参考与故障请求 | 确定的语义、边界和测试清单，不导入 Triton |
+| [kernels/](examples/kernels) | 按首次引入的阶段存放 24 个标准 Triton kernel | 前端检查和后端实现使用的源程序 |
+| [stage_cases/](examples/stage_cases) | 按验收阶段存放输入、constexpr、grid、独立参考和故障请求 | 各阶段的正例、边界与负例 |
+| [suite.py](examples/suite.py) | 汇总阶段测试，为 AOT 正例生成 `.jit` 镜像 | 统一的用例 ID 和清单 |
 | [dump_ttir.py](examples/dump_ttir.py) | 使用固定版本 ASTSource 生成并验证 TTIR | 仅前端可达性，不生成 ELF、不执行 Coral |
 | [lit](examples/lit/lit.cfg.py) 与 [ir_checks.txt](examples/ir_checks.txt) | 从源码生成 TTIR，再用 FileCheck 匹配语义相关结构。使用 MLIR verifier 验证手写正反例 | 前端语义和 IR 契约 |
 | [run_stage.py](examples/run_stage.py) | 请求生成、真实适配器调用、证据/数值/轨迹校验 | 拒绝占位 ELF、缺失证据、错误输出及不合法调度 |
@@ -99,6 +100,23 @@
 | S7 | 保持 block_add 源码，扩展存储执行语义 | 按副本/搬运需求新增 coral_mem | 7 | block_add |
 | S8 | tl.dot(INT8→INT32)、矩阵分块/尾部 | Linalg matmul → coral tile → 已验证 Zvt 接口 | 7 | matmul_i8 |
 | S9 | 浮点类型、间接读写、排序、原子与执行重叠 | 复用方言；只有新语义不能表达时才加操作/接口 | 14 | atomic_add_i32, bf16_widen, block_add, fp32_add, indexed_copy, sort_i32 |
+
+### 阶段文件
+
+在 kernel 首次引入的阶段维护函数。跨阶段复用时，在新的用例文件中指定 grid、核掩码或存储区域。新增 mask 长度、dtype 或负例时，优先添加用例参数。JIT 镜像由 `suite.py` 汇总生成，S1/S2 的镜像从 S3 开始执行。
+
+| 阶段 | Kernel 源码 | 输入、参考与验收用例 |
+| --- | --- | --- |
+| S0 骨架 | 复用 S1 `scalar_copy` | [s0_frontend.py](examples/stage_cases/s0_frontend.py) |
+| S1 标量 | [s1_scalar.py](examples/kernels/s1_scalar.py) | [s1_scalar.py](examples/stage_cases/s1_scalar.py) |
+| S2 block 与 mask | [s2_block.py](examples/kernels/s2_block.py) | [s2_block.py](examples/stage_cases/s2_block.py) |
+| S3 JIT 与 ABI | [s3_abi.py](examples/kernels/s3_abi.py) 与 S1/S2 kernel | [s3_jit.py](examples/stage_cases/s3_jit.py) |
+| S4 结构化访存 | [s4_structured.py](examples/kernels/s4_structured.py) | [s4_structured.py](examples/stage_cases/s4_structured.py) |
+| S5 归约与扫描 | [s5_collectives.py](examples/kernels/s5_collectives.py) | [s5_collectives.py](examples/stage_cases/s5_collectives.py) |
+| S6 多维 grid | [s6_grid.py](examples/kernels/s6_grid.py) | [s6_grid.py](examples/stage_cases/s6_grid.py) |
+| S7 分层存储 | 复用 S2 `block_add` | [s7_storage.py](examples/stage_cases/s7_storage.py) |
+| S8 dot | [s8_dot.py](examples/kernels/s8_dot.py) | [s8_dot.py](examples/stage_cases/s8_dot.py) |
+| S9 扩展能力 | [s9_extended.py](examples/kernels/s9_extended.py)，重叠测试复用 S2 `block_add` | [s9_extended.py](examples/stage_cases/s9_extended.py) |
 
 ### 第一次运行：先分清三种结果
 
@@ -131,7 +149,7 @@ export CORAL_ADAPTER=/absolute/path/to/coral_test_adapter.py
 
 ```python
 import triton
-from kernels import vector_add
+from kernels.s2_block import vector_add
 
 def launch_vector_add(x, y, z, n):
     block = 16
@@ -187,7 +205,7 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
     tl.store(Y, value + DELTA)
 ```
 
-先确认 scalar_copy 的真实 TTIR 包含加载和写回，再为 scalar_add 补齐常量及整数加法转换。随后接通 LLVM IR、入口包装、链接与控制 CPU 装载，在 core0 上验证输出。改变输入和 DELTA 后仍须算对，INT32_MAX+1 应按 32 位模运算得到 INT32_MIN。源码持续以 [kernels.py](examples/kernels.py) 为准。
+先确认 scalar_copy 的真实 TTIR 包含加载和写回，再为 scalar_add 补齐常量及整数加法转换。随后接通 LLVM IR、入口包装、链接与控制 CPU 装载，在 core0 上验证输出。改变输入和 DELTA 后仍须算对，INT32_MAX+1 应按 32 位模运算得到 INT32_MIN。源码见 [s1_scalar.py](examples/kernels/s1_scalar.py)。
 
 ```bash
 "$CORAL_PYTHON" "$CORAL_TUTORIAL/run_stage.py" --stage S1 --adapter "$CORAL_ADAPTER" --output "$CORAL_TEST_OUT/device"
@@ -319,6 +337,8 @@ def scalar_add(X, Y, DELTA: tl.constexpr):
 本次实现的是教程样例、参考codec和证据校验器。真实compiler/runtime适配器、ABI v3固件以及设备采集仍待相应任务实现；主机合成轨迹只用于校验器自检。
 
 1. 调用方式仍为同一解释器执行 `coral_test_adapter.py --request request.json --response response.json`。请求/响应的protocol必须为2；旧协议拒绝，不静默降级。nonce、request_sha256、kernel_source_sha256、pipeline=current-mainline绑定同一次调用。expected不发送，仅发送output_bindings。
+
+   适配器从 `kernels` 按函数名导入源码。`kernel_source_sha256` 使用 `kernels.source_sha256()` 计算，覆盖该包下所有 `.py` 文件名和源码，以统一换行后按文件名排序编码。记录自己的代码包摘要，便于发现适配器加载了另一份源码。
 2. mode有四种：frontend只验证真实TTIR；ir检查真实LLVM方言checkpoint（不要求ELF/启动）；aot经过实际AOT桥；jit必须通过[jit_entry.py](examples/jit_entry.py)调用真正的`kernel[grid](...)`，明确选择Coral driver。S1/S2在S3新增JIT镜像，S4～S8新语法均有AOT/JIT镜像。
 3. 顶层build产物记录Triton/LLVM/Coral提交、target、abi/abi_version、源码哈希及pipeline；实际执行的每步另提供invocation记录api/backend/kernel/grid/request_sha256/step和CompiledKernel返回ELF的哈希。jit的api为`kernel[grid](...)`，aot为aot_bridge；执行ELF必须与调用产物相同。记录须来自真实入口与工具，不能按请求直接填成功。
 4. 每个artifact为{path,sha256}，路径位于本case目录内。frontend需要ttir及verification.ttir；ir另需要llvm_dialect及verification.llvm_dialect，允许empty_kernel没有load/store。aot/jit需要真实llir/elf/trace、verification.llvm/elf、execution=rtl或device与完整outputs。zero-grid可不编译ELF，但需标准JIT调用记录、无launch轨迹与未改变的输出。
@@ -388,7 +408,7 @@ S3.cache在同一会话依次执行三步，cache_hit=false/true/false，前两k
 
 ### 支持能力与自动一致性检查
 
-任务、阶段和语法白名单以plan.json为统一数据源，正文与Excel同步展示；案例以suite.py的稳定ID维护。修改时先更新数据，再同步展示并运行下方检查，避免只改一张表。检查涵盖任务要求、阶段范围、ABI容量、用例清单和Excel白名单。
+任务、阶段和语法白名单以 `plan.json` 为统一数据源，正文与 Excel 同步展示。用例 ID 在各 `stage_cases/` 文件中维护，由 `suite.py` 汇总。修改测试范围时同步阶段清单并运行下方检查。检查涵盖任务要求、阶段范围、ABI 容量、用例清单和 Excel 白名单。
 
 ```bash
 "$CORAL_PYTHON" "$CORAL_TUTORIAL/check_plan.py" --workbook
@@ -411,7 +431,7 @@ S9-03 仅依赖 S5-03。G5 后可以暂缓多核/存储优化，直接选择下�
 
 2026-11-19 在 WSL 使用 `d63968303d` 的 Triton 构建和 LLVM 工具验证。34 个特化通过显式 CUDA 离线 TTIR 检查，5 个 lit 测试和 33 项主机自检通过。Coral 设备正例、真实 LLVM 降低以及 v3 固件仍待验证。
 
-2026-11-18 的 Coral 前端记录为 22 个特化，显式使用教程 INT8 下界时为 25 个特化。这次新增源码的 Coral 前端检查留待恢复 `compiler-1` 连接后执行。
+阶段文件拆分后，在 `compiler-1` 的 `4f045a9d77` 上复跑。S0～S7 的 Coral 前端验证了 27 个特化，显式启用教程 INT8 下界时 S0～S9 共验证 34 个特化。Coral 模式通过 4 组 lit，dot 组等待真实目标回调。显式 CUDA 离线模式通过全部 5 组 lit。
 
 4f045a9d77 的 get_codegen_implementation 返回空字典，dot 缺少 min_dot_size。前端脚本补充的语言选项也须在正式 CoralOptions 中按能力落实。
 

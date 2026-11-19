@@ -373,7 +373,7 @@ module {
   3. `third_party/coral/CMakeLists.txt`（加 `add_subdirectory(include)`、`add_subdirectory(lib)` 与 `LINK_LIBS CoralMinimalTritonToLLVM`）
   4. `bin/RegisterTritonDialects.h`（注册 `registerCoralMinimalTritonToLLVMPasses()`）
 - **本小步验收标准**：
-  使用已有真实源码 [empty_kernel](examples/kernels.py)，不把 `p: *i32` 当成 Python 类型注解：
+  从 [s1_scalar.py](examples/kernels/s1_scalar.py) 导入 `empty_kernel`，在 `ASTSource.signature` 声明指针类型：
 
   ```python
   @triton.jit

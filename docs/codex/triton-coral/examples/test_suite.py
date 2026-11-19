@@ -14,8 +14,10 @@ from abi import pack_frame, unpack_frame
 from check_plan import validate_plan
 from access import all_programs, program_accesses, select_cases
 from jit_entry import call_kernel
+from kernels import MODULE_KERNELS
 from run_stage import artifact, check_elf, check_trace, check_values, digest, request_for, verify_response
-from suite import cases, inventory, vector
+from stage_cases.inputs import vector
+from suite import cases, inventory
 
 HERE = Path(__file__).resolve().parent
 
@@ -109,7 +111,12 @@ class TutorialContractTests(unittest.TestCase):
     def test_sources_and_stage_coverage(self):
         items = cases(); self.assertEqual(len(self.by_id), len(items))
         self.assertEqual({c["stage"] for c in items}, {f"S{i}" for i in range(10)})
-        names = {n.name for n in ast.parse((HERE / "kernels.py").read_text()).body if isinstance(n, ast.FunctionDef)}
+        sources = {}
+        for path in (HERE / "kernels").glob("s*.py"):
+            module = ast.parse(path.read_text(encoding="utf-8"))
+            sources[path.stem] = tuple(n.name for n in module.body if isinstance(n, ast.FunctionDef))
+        self.assertEqual(sources, MODULE_KERNELS)
+        names = {name for group in sources.values() for name in group}
         self.assertEqual({s["kernel"] for c in items for s in c["steps"]}, names)
         plan = json.loads((HERE.parent / "plan.json").read_text(encoding="utf-8"))
         self.assertEqual(len(plan["syntax_stages"]), len(inventory()))

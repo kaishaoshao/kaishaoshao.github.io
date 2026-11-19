@@ -17,7 +17,7 @@
 
 修改计划时，按变更范围同步上述文件，保持任务 ID、阶段、依赖和验收标准一致。状态以 `plan.json` 为准；若用户先在 Excel 中修改状态，应先核对并回写数据，不能用旧数据覆盖用户进度。
 
-语法或测试范围变化时，同时核对 `plan.json` 的 `syntax_stages` 与 `examples/suite.py` 的用例 ID。每个语法增量包含真实 Triton 源程序、独立参考、边界/负例设计、对应 lowering 与方言职责。测试框架自检和仅 TTIR 验证不得计作 Coral 执行通过；缺少真实适配器或证据应明确失败。类型扩展任务 S9-03 在 G5 后可独立推进，不以多核/DMA/Zvt/双缓冲为技术前置。
+语法或测试范围变化时，同时核对 `plan.json` 的 `syntax_stages` 与 `examples/suite.py` 汇总的用例 ID。kernel 按首次引入的阶段放在 `examples/kernels/`，各阶段数据、参考值及负例放在 `examples/stage_cases/`。跨阶段共享同一 kernel。每个语法增量包含真实 Triton 源程序、独立参考、边界/负例设计、对应 lowering 与方言职责。测试框架自检和仅 TTIR 验证不得计作 Coral 执行通过；缺少真实适配器或证据应明确失败。类型扩展任务 S9-03 在 G5 后可独立推进，不以多核/DMA/Zvt/双缓冲为技术前置。
 
 维护 `standard_test_gates` 中的阶段代表用例。S1/S2 用标准源程序做 AOT，S3 后累计验证 `kernel[grid](...)`。能从源码生成的 IR 用 `examples/lit` 核对。非法 IR 与内部边界可写 verifier fixture，ABI 和运行行为用断言核验。
 

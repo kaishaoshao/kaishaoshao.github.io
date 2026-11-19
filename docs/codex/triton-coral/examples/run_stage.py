@@ -14,6 +14,7 @@ import uuid
 
 from suite import cases
 from access import select_cases
+from kernels import source_sha256
 from trace_contract import check_trace
 
 HERE = Path(__file__).resolve().parent
@@ -29,7 +30,7 @@ def request_for(case, nonce=None):
         item["output_bindings"] = list(item.pop("expected"))
     request.setdefault("abi_version", 2)
     request.update(protocol=2, nonce=nonce or uuid.uuid4().hex, pipeline="current-mainline",
-                   kernel_source_sha256=digest((HERE / "kernels.py").read_bytes()))
+                   kernel_source_sha256=source_sha256())
     encoded = json.dumps(request, sort_keys=True, allow_nan=False).encode()
     request["request_sha256"] = digest(encoded)
     return request

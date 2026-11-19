@@ -1554,8 +1554,10 @@
   "testing": {
     "protocol": 2,
     "validated_capabilities": [],
-    "source_file": "examples/kernels.py",
+    "source_file": "examples/kernels/__init__.py",
+    "source_dir": "examples/kernels",
     "cases_file": "examples/suite.py",
+    "case_source_dir": "examples/stage_cases",
     "runner": "examples/run_stage.py",
     "frontend_runner": "examples/dump_ttir.py",
     "host_tests": "examples/test_suite.py",
@@ -1569,7 +1571,7 @@
       "指令/资源/故障/性能证据"
     ],
     "case_selection": "默认累计回归包括阶段必需用例和validated_capabilities中已验收模式；G5后已验收S9类型分支也纳入。--case仅跑指定项，不代表累计出口通过。",
-    "frontend_note": "22 个特化在独立前端选项下通过当前 Coral hook 路径；加入显式教程INT8下界后共25个特化通过。新增empty_kernel和六运行参数源码仅验证前端可达；尚无新ELF/设备执行证据。",
+    "frontend_note": "按阶段拆分后，compiler-1 的 Coral 前端验证 S0～S7 共 27 个特化。显式启用教程 INT8 下界后验证 S0～S9 共 34 个特化。真实 Coral dot 回调与设备执行待验收。",
     "current_gap": "4f045a9d77 的 get_codegen_implementation 返回空字典，dot 缺少 min_dot_size。前端脚本补充的语言选项也须在正式 CoralOptions 中按能力落实。",
     "trust_boundary": "适配器须从真实编译工具和 RTL/设备采集产物及轨迹。校验器可拒绝缺失/错配/不合法证据，不能认证一个恶意适配器没有伪造文件。",
     "regression_pipeline": "current-mainline；旧 case 也走当前主线，不能按 case.stage 偷切旧实现。",

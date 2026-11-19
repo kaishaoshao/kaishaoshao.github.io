@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from suite import cases
 
 
-def make_ttir(item, tutorial_dot_contract=False, frontend_target="coral"):
+def make_ttir(item, tutorial_dot_contract=False, frontend_target="coral", *, backend_options=False):
     from triton.backends import backends
     from triton.backends.compiler import GPUTarget
     from triton.compiler.compiler import ASTSource
@@ -36,7 +36,7 @@ def make_ttir(item, tutorial_dot_contract=False, frontend_target="coral"):
     target = GPUTarget("coral", "coral-rv32", 1) if frontend_target == "coral" else GPUTarget("cuda", 80, 32)
     backend_name = "coral" if frontend_target == "coral" else "nvidia"
     backend = backends[backend_name].compiler(target)
-    if frontend_target == "cuda":
+    if frontend_target == "cuda" or backend_options:
         options = backend.parse_options({})
     backend.load_dialects(context)
     codegen = backend.get_codegen_implementation(options)
@@ -65,30 +65,39 @@ def main():
                         help="proposed INT8 16x16x32 frontend bound, not implemented backend/hardware support")
     parser.add_argument("--frontend-target", choices=("coral", "cuda"), default="coral",
                         help="cuda explicitly selects an offline upstream language check")
+    parser.add_argument("--backend-options", action="store_true",
+                        help="use the actual CoralBackend.parse_options for a frontend check")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.tutorial_dot_contract and args.frontend_target != "coral":
         parser.error("the tutorial dot contract applies only to the Coral frontend")
+    if args.backend_options and (args.tutorial_dot_contract or args.frontend_target != "coral"):
+        parser.error("--backend-options checks Coral without tutorial overrides")
     selected = [c for c in cases() if (int(c["stage"][1:]) <= int(args.stage[1:]) if args.cumulative
                                      else c["stage"] == args.stage) and (not args.case or c["id"] in args.case)]
     if not selected or not set(args.case) <= {c["id"] for c in selected}:
         parser.error("case ID is unknown or outside the selected stage")
+    if args.case and any(case["error"] for case in selected):
+        parser.error("diagnostic cases require run_stage.py; select a positive case to generate TTIR")
+    selected = [case for case in selected if not case["error"]]
+    if not selected:
+        parser.error("no positive frontend cases selected")
     args.output.mkdir(parents=True, exist_ok=True)
     seen, inventory = set(), []
     for case in selected:
-        if case["error"]:
-            continue
         for index, item in enumerate(case["steps"]):
             key = json.dumps([item["kernel"], {n: b["dtype"] for n, b in item["buffers"].items()},
                               item["constants"]], sort_keys=True)
             if key in seen and not args.case:
                 continue
             seen.add(key)
-            text = make_ttir(item, args.tutorial_dot_contract, args.frontend_target)
+            text = make_ttir(item, args.tutorial_dot_contract, args.frontend_target,
+                             backend_options=args.backend_options)
             filename = f"{case['id']}.{index}.ttir"
             (args.output / filename).write_text(text, encoding="utf-8")
             inventory.append({"case": case["id"], "kernel": item["kernel"], "file": filename})
     metadata = {"scope": "frontend-only", "frontend_target": args.frontend_target,
+                "options": "backend" if args.backend_options or args.frontend_target == "cuda" else "tutorial",
                 "dot_contract": "tutorial-proposal" if args.tutorial_dot_contract else "backend",
                 "specializations": inventory}
     (args.output / "frontend.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")

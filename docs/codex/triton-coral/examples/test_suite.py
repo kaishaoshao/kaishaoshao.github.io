@@ -164,6 +164,17 @@ class TutorialContractTests(unittest.TestCase):
     def test_plan_data_markdown_and_abi_agree(self):
         self.assertTrue(validate_plan()["consistent"])
 
+    def test_frontend_dump_diagnostic_case_requires_adapter(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "frontend"
+            result = subprocess.run(
+                [sys.executable, str(HERE / "dump_ttir.py"), "--stage", "S0", "--case", "S0.bad-target",
+                 "--output", str(output)], capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("diagnostic cases require run_stage.py", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_plan_checker_detects_scope_drift(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

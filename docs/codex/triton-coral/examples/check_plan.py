@@ -8,13 +8,37 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from abi import CAPACITY, FRAME_SIZE
-from suite import cases, inventory
+from kernels import MODULE_KERNELS
+from suite import STAGES, cases, inventory
 
 HERE = Path(__file__).resolve().parent
 
 
 def normalized(value):
     return re.sub(r"\s+", " ", str(value).replace("`", "").replace("\\|", "|")).strip()
+
+
+def markdown_prose(path):
+    text = path.read_text(encoding="utf-8")
+    if len(re.findall(r"^\s*```", text, re.M)) % 2:
+        raise ValueError("unbalanced Markdown fences: " + path.name)
+    return re.sub(r"```[\s\S]*?```", "", text)
+
+
+def check_links(path):
+    prose = re.sub(r"`[^`\n]*`", "", markdown_prose(path))
+    for target in re.findall(r"\]\(([^)]+)\)", prose):
+        if re.match(r"[a-z]+://", target):
+            continue
+        name, _, anchor = target.partition("#")
+        destination = path.parent / name if name else path
+        if not destination.exists():
+            raise ValueError(f"broken relative link in {path.name}: {target}")
+        if anchor and destination.suffix == ".md":
+            headings = re.findall(r"^#{1,6} (.+)$", markdown_prose(destination), re.M)
+            anchors = {re.sub(r"[^\w\s-]", "", heading.lower()).replace(" ", "-") for heading in headings}
+            if anchor not in anchors:
+                raise ValueError(f"broken heading link in {path.name}: {target}")
 
 
 def validate_plan(folder=HERE.parent, *, workbook=False):
@@ -51,27 +75,40 @@ def validate_plan(folder=HERE.parent, *, workbook=False):
     for row in data["standard_test_gates"]:
         row_present(row)
     actual = inventory()
+    catalog = {case["id"]: case for case in cases()}
     counts = data["testing"]["generated_counts"]
-    if counts != {"kernels": len({name for stage in actual for name in stage["kernels"]}), "cases": len(cases())}:
+    if counts != {"kernels": len({name for stage in actual for name in stage["kernels"]}), "cases": len(catalog)}:
         raise ValueError("generated case/kernel counts differ")
     if [row[0] for row in data["standard_test_gates"]] != [stage["stage"] for stage in actual]:
         raise ValueError("standard test gates must cover each stage in order")
     if len(actual) != len(data["syntax_stages"]):
         raise ValueError("stage inventory length differs")
-    for planned, observed in zip(data["syntax_stages"], actual):
+    for planned, observed, module in zip(data["syntax_stages"], actual, STAGES):
         if any(planned[key] != observed[key] for key in ("stage", "case_ids", "kernels")):
             raise ValueError("stage inventory differs: " + observed["stage"])
+        entry = planned["lesson_entry"]
+        identity = entry["case_id"]
+        if identity not in observed["case_ids"] or catalog[identity]["error"]:
+            raise ValueError("invalid lesson entry: " + identity)
+        if entry["action"] not in ("frontend", "prepare", "dot-preview"):
+            raise ValueError("unknown lesson action: " + entry["action"])
+        module_kernels = MODULE_KERNELS.get(Path(entry["kernel_file"]).stem, ())
+        if any(step["kernel"] not in module_kernels for step in catalog[identity]["steps"]):
+            raise ValueError("lesson kernel file does not match: " + identity)
+        if Path(entry["case_file"]).stem != module.__name__.split(".")[-1]:
+            raise ValueError("lesson case file does not match: " + identity)
+        for field in ("kernel_file", "case_file"):
+            if not (folder / entry[field]).is_file():
+                raise ValueError("missing lesson file: " + entry[field])
+        flag = {"frontend": "", "prepare": " --emit-only", "dot-preview": " --tutorial-dot-contract"}[entry["action"]]
+        if f'--stage {observed["stage"]} --case {identity}{flag} ' not in md:
+            raise ValueError("lesson command differs from plan: " + identity)
     for version in (2, 3):
         abi = data["abi_contract"][str(version)]
         if (abi["bindings"], abi["scalars"]) != CAPACITY[version] or abi["size"] != FRAME_SIZE[version]:
             raise ValueError("ABI codec/document capacity differs")
-    prose = re.sub(r"```[\s\S]*?```", "", md)
-    prose = re.sub(r"`[^`\n]*`", "", prose)
-    for target in re.findall(r"\]\(([^)]+)\)", prose):
-        if not re.match(r"[a-z]+://|#", target) and not (folder / target.split("#")[0]).exists():
-            raise ValueError("broken relative link: " + target)
-    if sum(line.startswith("```") for line in md.splitlines()) % 2:
-        raise ValueError("unbalanced Markdown fences")
+    for name in ("plan.md", "backend-skeleton.md", "tutorials/01-backend-skeleton.md"):
+        check_links(folder / name)
     if workbook:
         ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
         with zipfile.ZipFile(folder / "tasks.xlsx") as archive:
@@ -94,8 +131,8 @@ def validate_plan(folder=HERE.parent, *, workbook=False):
                 if key == "phases":
                     for index, stage in enumerate(data["syntax_stages"], 35):
                         row = [stage["stage"], stage["syntax"], stage["dialects"], len(stage["case_ids"]),
-                               stage["positive_boundary"], stage["negative"], stage["exercise"]]
-                        if [values.get(f"{col}{index}", "") for col in "ABCDEFG"] != [str(v) for v in row]:
+                               stage["positive_boundary"], stage["negative"], stage["exercise"], stage["lesson_entry"]["case_id"]]
+                        if [values.get(f"{col}{index}", "") for col in "ABCDEFGH"] != [str(v) for v in row]:
                             raise ValueError("XLSX lesson inventory differs: " + stage["stage"])
                     for index, row in enumerate(data["standard_test_gates"], 61):
                         if [values.get(f"{col}{index}", "") for col in "ABDF"] != row:

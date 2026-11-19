@@ -20,7 +20,7 @@
 
 语法或测试范围变化时，同时核对 `plan.json` 的 `syntax_stages` 与 `examples/suite.py` 汇总的用例 ID。kernel 按首次引入的阶段放在 `examples/kernels/`，各阶段数据、参考值及负例放在 `examples/stage_cases/`。跨阶段共享同一 kernel。每个语法增量包含真实 Triton 源程序、独立参考、边界/负例设计、对应 lowering 与方言职责。测试框架自检和仅 TTIR 验证不得计作 Coral 执行通过；缺少真实适配器或证据应明确失败。类型扩展任务 S9-03 在 G5 后可独立推进，不以多核/DMA/Zvt/双缓冲为技术前置。
 
-维护 `syntax_stages[].lesson_entry` 中的开课命令和 `standard_test_gates` 中的阶段出口。S1/S2 用标准源程序做 AOT，S3 后累计验证 `kernel[grid](...)`。能从源码生成的 IR 用 `examples/lit` 核对。非法 IR 和内部边界用 verifier fixture，ABI 和运行行为用断言核验。
+维护 `syntax_stages[].lesson_entry` 的开课命令、`tutorial_checkpoints` 的小阶段目标及测试和 `standard_test_gates` 的阶段出口。小阶段对应稳定任务 ID，区分源码检查、主机自检、设备用例及待补测试。S1/S2 用标准源程序做 AOT，S3 后累计验证 `kernel[grid](...)`。能从源码生成的 IR 用 `examples/lit` 核对。非法 IR 和内部边界用 verifier fixture，ABI 和运行行为用断言核验。
 
 任务要求、阶段和语法白名单统一维护在 `plan.json`，再同步正文和任务表，运行 `examples/check_plan.py --workbook` 防止漂移。测试协议2按逻辑访存及数据版本检查依赖；已验收的可选能力按执行模式登记并进入累计回归。ABI v3 的参考 codec 不代表固件已实现，必须由 S3-02 完成双端解析与真实六参数验收。
 

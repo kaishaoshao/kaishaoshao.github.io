@@ -1,6 +1,6 @@
 # 编译器输出与 SimX 的接口
 
-当前固定为 Vortex 3.0、RV64、默认硬件配置。2026-11-18 按固定 SDK `26d2bc4b5409a35a111e8316ac3a87d07b15fc80` 的实现补充本契约；以下区分现有 native ABI 与拟定 HIP 参数格式。
+教程接口复核日期：2026-11-19。当前固定为 Vortex 3.0、RV64、默认硬件配置；2026-11-18 按固定 SDK `26d2bc4b5409a35a111e8316ac3a87d07b15fc80` 的实现补充本契约；以下区分现有 native ABI 与拟定 HIP 参数格式。
 
 ```text
 你的 LLVM
@@ -19,7 +19,7 @@ SimX 不解析 HIP 源码。结构正确的 ELF / `.vxbin` 还需要匹配指令
 验收脚本使用 `vortex/tests/regression/common.mk` 的实际配置：
 
 - ELF64 little-endian，RISC-V ET_EXEC。`.o` / ET_REL 必须先链接。
-- target：`riscv64-unknown-elf`；默认 `rv64imafd` / `lp64d`，加 `+xvortex` 和 `+zicond`。A/C 等扩展要与模拟器配置一致。
+- target：`riscv64-unknown-elf`；参考 Makefile 写 `rv64imafd` / `lp64d`，加 `+xvortex` 和 `+zicond`；其中 A 与当前 SimX 默认关闭 A 存在差异。此处记录参考命令，不代表严格配置一致已验收；新 CPU 默认与库/镜像审计见 [ISA 配置](architecture.md#isa-config)。
 - 原生 RV64 测试使用 `STARTUP_ADDR=0x180000000`、`-mcmodel=medany` 及 `sw/kernel/scripts/link64.ld`。
 - 链接 `libvortex2.a`，编译并链接 KMU 启动代码。
 - kernel 带 `vortex.kernel` annotation，后端生成 `__vx_kentry_<name>` 符号。`kernel_main` 在模块中暴露为 `main`。
@@ -35,6 +35,65 @@ vortex/sw/kernel/scripts/link64.ld
 vortex/sw/kernel/scripts/vxbin.py
 vortex/sw/runtime/include/vortex2.h
 ```
+
+
+<a id="l03-walkthrough"></a>
+
+## L03 操作图：单个 out 指针怎样到达 store42
+
+这是供你实现的教学桥接，**尚未作为新后端设备镜像执行通过**。先在 L02 得到实际函数 IR，再逐步填齐下面的产物，不假定现有 demo host 能启动任意函数。
+
+```text
+host 分配输出 buffer → 查询设备地址 out_addr
+  → 序列化为 8 字节参数区（一个 RV64 设备指针）
+  → vx_enqueue_launch(args_host 指向这 8 字节，args_size=8)
+  → SDK 复制参数区，设备 startup 把参数区地址放到 a0
+  → native wrapper 从偏移 0 读出 out_addr
+  → 调用逻辑 store42(out_addr) → 写入 42
+  → host 等待 launch，再读回输出验证
+```
+
+参数区地址与 out_addr 是两级不同的指针；a0 接到的不是输出 buffer 本身。host 上传/读回数据也要遵循 SDK 的 event/等待规则，不能先读旧值再等待 launch。
+
+### 第一步：只建立可检查的 IR wrapper
+
+下面片段用于追加到本阶段产生的设备 IR（教学示意，不是可独立链接的完整模块）。先确认 body 的真实符号与普通调用约定；当前最小输入观察到的名字是 _Z7store42Pi，不将 C++ 名字硬编码进正式生成器。
+
+```llvm
+define void @kernel_main(ptr %arg_blob) section ".vx_entry" {
+entry:
+  %out = load ptr, ptr %arg_blob, align 8
+  call void @_Z7store42Pi(ptr %out)
+  ret void
+}
+
+@__vx_kentry_kernel_main = alias void (ptr), ptr @kernel_main
+```
+
+wrapper 在 IR 层调用逻辑 body。设备 C++ 源码中直接调用 __global__ 函数仍受 HIP 语义检查，不能为了教学桥接把它改成允许的普通源级调用。
+
+.vx_entry 由固定 link64.ld 的 KEEP 规则保留；正式生成器还要核对入口/别名的保留属性、重复生成和多 kernel 情形。不要只创建 alias 就假定底层函数不会被 --gc-sections 删除。L05 才自动生成这类入口与版本化参数描述。
+
+### 第二步：逐层检查，不跳到模拟器
+
+| 产物 | 检查 | 出错时先处理什么 |
+|---|---|---|
+| body.ll + wrapper | verifier、函数签名、指针宽度、偏移 0/对齐 8 | 不调用不存在或错误签名的 body |
+| 设备对象 | RV64 ELF、实际 CPU/features、目标指令 | CPU/feature、lowering 或未支持指令 |
+| kernel.elf | _start、__vx_cta_entry、kernel_main、alias、section/段地址、_edata/_end | startup/库、链接脚本、入口保留、BSS |
+| kernel.vxbin | min/max_vma、payload、VXSYMTAB 的 main→wrapper PC | 打包器和 alias→导出名映射 |
+| host launch | args_size=8、grid/block 各 1、kernel handle 指向 main | host 准备的布局、对象与事件依赖 |
+| 输出 | 先初始化为非 42，再运行/等待/读回得到 42 | 本次镜像身份、参数、启动，再查 body |
+
+链接继续参考固定 tests/regression/common.mk 的完整设备选项，并逐项记录 compiler/startup/libc/compiler-rt/LLD 来源。其原样参数含 A，与默认 SimX 的差异见 [ISA 配置](architecture.md#isa-config)；不要把复用参考库的桥接结果标成完整 ISA 对齐通过。当前脚本没有自动为任意新 ABI 生成 host。
+
+### 第三步：写自己的最小 SDK host
+
+按 demo/main.cpp 的真实 API 依次实现：device/queue 创建 → buffer 分配与设备地址查询 → module 加载和 main kernel 查找 → launch → 依赖 launch 的读回 → 等待 → 验证/释放。所有 SDK 返回值都检查，资源的成功/失败路径均清理。
+
+launch_info 的关键字段是 struct_size、kernel、args_host、args_size、ndim、grid_dim、block_dim；用 sizeof 正确初始化结构版本。args_host 指向本次序列化的参数值，不能传 host 的 int*。用有界等待保存失败证据；SimX abort 的进程级故障不一定能变成 HIP 错误码。
+
+每次保存三个不同的值：program_pc（公共 startup）、kernel_pc（wrapper）、args_addr（设备参数区）。先完成单线程，再沿用同一链路进入 L04 的线程编号。现成 demo 的 40 字节参数和下面 vecadd 的 32 字节参数都不能代替本实验的 8 字节布局。
 
 ## 两个现成 host 的参数布局
 
@@ -106,7 +165,7 @@ VXSYMTAB 提供名称和入口 PC，不包含 HIP 参数类型/对齐/偏移信�
 
 2026-11-18 用参考 Clang 20.1.8、`--target=riscv64-unknown-elf -march=rv64imafd -mabi=lp64d` 对对应自然 C++ 结构做了 sizeof/alignof/offsetof 静态断言，32/8 字节及 0/8/16/24 偏移检查通过。这只核对参考目标的数据布局，不代表 LLVM 23 的参数生成器、wrapper 或端到端执行已完成。
 
-host launch 的参数数组保存 `&da、&db、&dc、&n`，runtime 从这些 host 地址分别读取参数值，写入目标参数区。指针参数写入的是 da/db/dc 的设备地址值；不会把 `&da` 等 host 地址传给设备，也不能直接复制整个 void** 数组作为设备参数。wrapper 接收单一参数区指针，从规定偏移解包并调用 kernel 实现。
+host launch 的参数数组保存 `&da、&db、&dc、&n`，runtime 从这些 host 地址分别读取参数值，写入目标参数区。指针参数写入的是 da/db/dc 的设备地址值；不会把 `&da` 等 host 地址传给设备，也不能直接复制整个 void** 数组作为设备参数。wrapper 接收单一参数区指针，从规定偏移解包，在 IR/CodeGen 层调用 kernel 实现；这不是允许设备 C++ 源码直接调用 __global__ 函数。
 
 最小元数据需明确：格式版本、kernel 标识和入口、每参数的 kind/size/alignment/offset、总大小和对齐、所需 ISA/ABI、静态共享内存与必要编译假设。对未知版本、参数数量不符、越界或重叠布局、超限资源有明确错误；不能依赖“碰巧和 host sizeof 相同”。
 

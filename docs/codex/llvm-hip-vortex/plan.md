@@ -1,6 +1,6 @@
 # LLVM 23 原生 HIP/Vortex 教程与任务路线
 
-设计基线：2026-11-17；更新日期：2026-11-18（Asia/Shanghai）。本文是供你逐步实现的教程与任务设计，不表示相关后端已经完成。
+设计基线：2026-11-17；更新日期：2026-11-19（Asia/Shanghai）。本文是供你逐步实现的教程与任务设计，不表示相关后端已经完成。
 
 本教程采用 **6 个阶段的最小实现主线**：`store42 → vecadd → 一个已有 HIP 程序`。先观察 Clang 的语法/AST/Sema/IR，再按程序需要修改后端、ABI 和 runtime；第 3 阶段就执行设备代码，第 5 阶段接通普通 HIP 启动，第 6 阶段移植已有程序。第一个可用版本不以所有高级能力完成为前提。
 
@@ -35,173 +35,151 @@ L01 的三个观察实验可以先使用已安装参考 Clang。L02 修改 LLVM 
 
 L03 是首个分层执行结果，仍可有显式教学桥接；L05 是最小可用的原生 HIP 流程；L06 是已有源码的移植验收。阶段通过不自动完成整组 Txx，运行一个程序也不代表完整 HIP 兼容。O0/O2、入口与参数、实际编译器来源等要求按本阶段执行范围落实。
 
+<a id="l01"></a>
+
 ### L01：看懂 HIP 前端
 
-#### 1.1 属性和 AST
+**问题。** Clang 已经做了什么？从源码到设备 IR，还没有做什么？输入为 store42 和普通 device helper，暂不涉及线程编号。
 
-使用 [实验 1.1](getting-started.md#lesson-1) 的两个函数：device helper `twice` 和 kernel `store42`。先不引入 threadIdx、动态分配、特殊指令或 SimX。
+**按顺序做。** 完整命令、固定输入、预期结果与解释集中在 [getting-started.md](getting-started.md#lesson-1)：1.1 预处理/属性 AST → 1.2 两种非法调用与启动 AST → 1.3 RISC-V device IR。也可运行 [run_l01.py](examples/run_l01.py) 保存七项观察的证据。
 
-自己完成：查看 __global__ 宏展开，定位 AST 中的 CUDAGlobalAttr/CUDADeviceAttr，再增加一个 __host__ 函数和一个未标记函数，比较其语义。AST 使用 CUDA 前缀是共享实现的命名，不表示输入被当成 NVIDIA 程序。
+**读哪里。** 先在 AST 中找到 CUDAGlobalAttr，再阅读 SemaCUDA.cpp 的调用侧与配置检查；从 CodeGen 的函数属性/target hook 追到 IR。不要求第一天读完整个后端。
 
-本课终点：能解释“属性已被识别”和“设备程序已可运行”的区别。第一课不要求完成 LLVM 全量构建和所有硬件配置分析。
+**应得出的结论。** 现有 Clang 已能保留部分 HIP/目标信息；缺少的是 Vortex 下游可稳定消费的入口契约和完整编译/执行连接。CPU 属性在本实验中是刻意选择的 generic-rv64，store42 本身无需 SIMT 控制指令。详细区分见 [桥接关系](architecture.md#hip-ir-bridge)。
 
-#### 1.2 调用限制与启动表达式
+**完成条件。** 观察检查通过，保存版本/输入/IR和解释；能够区分 AST 属性、IR 函数属性、逻辑 kernel 标记与 native 入口。这里没有设备执行，不能把这一步登记成 T07/T08 整组通过。
 
-先用最小反例观察 host 直接调用 device 函数为何被拒绝。可复用第一课的宏，另外写：
-
-```cpp
-__device__ int device_only() { return 7; }
-int main() { return device_only(); }
-```
-
-用第一课的 HIP host-only 语法检查命令运行，预期失败；记录错误位置和说明，不只记录非零返回值。反方向的 device→host 调用要在设备语义检查中观察，不能假定 host-only 检查已覆盖两个方向。
-
-随后观察 <<<>>>。下面是供 **AST 实验** 使用的完整最小输入；函数声明只满足本实验的查找与类型检查，不是 runtime 实现或最终公开 ABI。
-
-```cpp
-#define __global__ __attribute__((global))
-struct dim3 {
-  unsigned x, y, z;
-  constexpr dim3(unsigned x=1, unsigned y=1, unsigned z=1)
-      : x(x), y(y), z(z) {}
-};
-using hipStream_t = void*;
-extern "C" int __hipPushCallConfiguration(
-    dim3, dim3, __SIZE_TYPE__=0, hipStream_t=nullptr);
-__global__ void store42(int* out) { *out = 42; }
-void launch(int* out) { store42<<<1,1>>>(out); }
-```
-
-将其保存为自己的实验文件，按第一个实验的 `-fsyntax-only -Xclang -ast-dump` 模式检查，查找 CUDAKernelCallExpr 和实际引用的配置函数。2026-11-18 的参考 Clang 实验观察到 __hipPushCallConfiguration；新 LLVM/不同模式以生成结果为准。此输入不能被当作已经可以链接运行的 HIP 应用。
-
-自己完成：指出 grid/block 参数、普通 kernel 参数和隐式配置调用分别在 AST 哪一部分。阅读入口为 Clang `SemaCUDA.cpp` 的执行配置与 target 检查，再阅读 CodeGen 中 host stub 的相关位置，暂不实现整套 runtime。
-
-#### 1.3 设备 IR
-
-复用 L01 的 attributes.hip，做一个隔离的设备前端实验：
-
-```bash
-"$HIP_TUTORIAL_CLANG" -cc1 \
-  -triple riscv64-unknown-elf -target-cpu generic-rv64 \
-  -target-feature +m -target-feature +f -target-feature +d \
-  -target-abi lp64d -x hip -fcuda-is-device \
-  -emit-llvm -O0 -o artifacts/tutorial/l01/device.ll \
-  artifacts/tutorial/l01/attributes.hip
-```
-
-这是 Clang 内部 cc1 接口的教学实验，绕过了正式 offload driver；它不是已经支持 HIPVortex 公共命令的证据。先使用 generic-rv64，因为一个简单 store 尚不需要 Vortex 特殊指令。
-
-自己完成：查找 target triple/DataLayout、两个函数、store i32 42、函数属性与 calling convention；检查哪些 HIP 信息保留下来，哪些不够下游识别 kernel。参考实验生成了 RISC-V IR，但并没有自动得到 SDK 所需的 native 入口/参数 wrapper。不能用函数名字或某个通用属性猜测“这就是可启动的 Vortex kernel”。
-
-本课终点：画出 AST→IR，并列出 L02 要补的连接信息。可以进一步用相同设备语义模式检查 device 调用 host 的反例，预期诊断失败。
-
-本阶段按 1.1→1.2→1.3 推进，不要求一次理解整套编译器。退出条件：保留预处理/AST、两种非法调用诊断、launch AST、RISC-V device IR，并指出“能产生 IR”和“可启动镜像”之间还缺什么。参考工具观察通过不计作新 LLVM 23 支持。
+<a id="l02"></a>
 
 ### L02：建立 Vortex 编译入口，开始修改后端
 
-从这里开始构建并使用 LLVM 23，方法见 [build.md](build.md) 和 [T00 工程基线附录](getting-started.md#engineering-baseline)。先重跑 L01 的三个实验，记录与参考工具的差异。
+**问题。** 下游怎样可靠地区分 HIP kernel 和 helper？怎样选择实际支持的设备指令？继续使用同一份 attributes.hip，每次只增加一个连接点。
 
-第一个源码练习建议是：在 **RISC-V HIP 设备上下文** 为逻辑 kernel 保留一个稳定、可测试的标记，普通 device helper 不产生该标记。先写 CodeGen 正例/反例，再选择具体 IR 表达；阅读 CodeGenModule.cpp 中 CUDAGlobalAttr 的处理和 RISC-V target 接口，而不是先扩展词法/语法规则。
+**准备。** 使用你构建的 Clang 23 重跑 L01，记录源码 HEAD 与二进制 --version。没有成品时才按 [LLVM 构建步骤](build.md#llvm-build) 构建；不把“重跑完整构建”变成每次修改文档的要求。
 
-逻辑 HIP kernel 标记与 SDK 的 `vortex.kernel` 原生单参数区入口契约要区分；直接把多参数 HIP body 当 native 入口会传错参数。后续生成 wrapper 时再建立二者的对应。
+| 小实验 | 你自己做的改动/分析 | 观察和测试 | 本步结束时停在哪里 |
+|---|---|---|---|
+| L02.1 | 追踪 FunctionDecl→CodeGen target hook；选定逻辑 HIP kernel 的 IR 表达 | 对照 kernel/helper 的实际属性，写出正例和反例 | 只确定标记语义，不生成 wrapper |
+| L02.2 | 在 RISC-V HIP device 上下文发射标记 | kernel 有标记；helper、host job、普通 RV64 不误标；O0/O2 保留 | 下游可识别逻辑 kernel |
+| L02.3 | 定义 xvortex feature、RV64 CPU 和匹配基线的默认 ISA/ABI | -###、IR target-cpu/features、llc/MC 选择、禁用/错误位宽 | CPU 选择正确，不等同可执行 |
+| L02.4 | 只添加首条 TMC 的 TableGen/MC 支持 | 正确寄存器编码、反汇编、feature 关闭和非法操作数 | 工具认识一条指令 |
+| L02.5 | 从同一 HIP 输入生成设备对象 | ELF machine/class、函数/标记和实际编译参数 | 对象可用于下一阶段链接 |
 
-接下来按需要加入 mcpu=vortex 的默认设备配置和 HIP device-only driver 路由，让正常 driver 命令也能产生已观察到的设备 IR。每次只提交一个连接点；接受 CPU 参数、生成 IR 与生成可执行 kernel 分别验收。
+源码阅读先用这些**现有入口**定位，不根据旧版本行号直接插代码：
 
-**本阶段就开始修改后端。** 将本课拆成小节：先保留 kernel 信息，再建立 CPU/feature，随后添加首条 TMC 的 MC 支持。每小节是独立小提交；完整 driver 编排可以继续在后续课完善。
+```bash
+cd /home/kaikai/vortex-word/llvm-project
+rg -n 'setTargetAttributes|SetLLVMFunctionAttributesForDefinition' clang/lib/CodeGen/CodeGenModule.cpp
+rg -n 'setTargetAttributes|RISCVInterruptAttr' clang/lib/CodeGen/Targets/RISCV.cpp
+rg -n 'OffloadUniformBlock|uniform-work-group-size' clang/lib/CodeGen/CGCall.cpp
+```
 
-第一条后端指令练习对应 T02.3：在 RISCV 扩展指令文件定义 `vx_tmc rs1`，接入 xvortex 谓词，核对固定字段，然后为汇编/反汇编/禁用 feature 添加测试。`vx_tmc a0` 的参考编码为 `0x0005000b`（小端字节 `0b 00 05 00`），核对方法见 [指令集章节](architecture.md#vortex-isa)。此时先不要求 Clang 为某段 C++ 自动生成它。
+本地基线的 RISCVTargetCodeGenInfo::setTargetAttributes 已存在，但其处理 interrupt 属性的早退不适合直接套用到 HIP 标记；先确认控制流与声明类型，再选择 target hook 或更合适的 CodeGen 入口。不要因为函数名叫 CodeGenModule 就把所有目标逻辑塞进公共路径。
 
-本阶段小步骤：① 重跑 L01 并保存新工具版本；② 为逻辑 kernel 加标记及 helper 反例；③ 接通 CPU/feature 与设备编译路由；④ 完成 TMC 的 MC 往返和负例；⑤ 为 store42 生成设备对象。driver 编排可在后续逐步完善，接受 CPU 参数、产生对象和执行正确分别验收。
+标记的形式（函数属性/annotation/专用 metadata）先写成契约：触发条件、消费者、优化后的存续和负例。它表示“这是逻辑 HIP kernel”，不表示“这是 SDK 可以直接调用的单参数区函数”。不能直接把多形参 HIP body 标成 native vortex.kernel 而省略解包入口，也不能用函数名、norecurse 或 uniform-work-group-size 猜测 kernel 身份。
 
-退出条件：新 LLVM 能识别本阶段的 Vortex 配置和 kernel 信息，生成 store42 设备对象，MC 测试有证据；对象暂时不要求已能独立执行。每一步单独提交，不把整阶段合成一个大 patch。
+CPU/feature 在 T01 中核对。当前基线默认 A/C 关闭，新的 CPU 默认能力必须一致；SDK 参考命令含 A 的差异见 [ISA 配置](architecture.md#isa-config)。最终 xvortex 版本/ISA 字符串在实现时冻结，不提前虚构一个公共 --offload-arch 拼写。
+
+TMC 的参考输入 `vx_tmc a0` 应编码为 `0x0005000b`，小端字节 `0b 00 05 00`。先用参考工具理解 [编码实验](architecture.md#66-编码长什么样)，再用新 llvm-mc 做定向正/反例。这里不要求 Clang 为任意 C++ 代码自动生成 TMC。
+
+**提交与出口。** 标记、CPU/feature、MC 各自独立提交，并加对应的 Clang CodeGen/Driver、TargetParser、MC 测试。L02 出口是 kernel 信息和设备对象可检查，尚未证明启动或 SIMT；T01/T02/T03 只登记本次覆盖的子项。
+
+<a id="l03"></a>
 
 ### L03：执行第一个 kernel，主机读回 42
 
-保持 `store42(int* out)`，launch 限定一个 block、一个线程。这个范围可先绕开线程坐标和 lane 分歧，让问题集中在对象、链接、启动与参数上。
+**问题。** 同一个 store42 的 out 指针怎样从 host 到达设备函数？只启动一个 block、一个线程，将问题收敛到 ABI、链接和镜像。
 
-用固定 SDK 做 host 分配/启动/读回；允许先写教学用 native wrapper/参数桥接，并复用参考 startup/设备库/链接工具。明确记录哪些部分手工生成、哪些由新 LLVM 产生；手工桥接通过只算分层实验，不算完整原生 HIP 支持。不要把任意 store42 镜像直接交给只认 demo/sgemm ABI 的现有 runner。
+**先读。** [compiler-sim-contract.md 的 L03 操作图](compiler-sim-contract.md#l03-walkthrough) 与 SDK demo 的 host 调用。使用 [Vortex 构建脚本](build.md#simx-build) 保持参考 SDK/SimX 当前可用。
 
-自己完成：把 out 的设备地址装入参数区，检查公共启动 PC/kernel PC/args，再在 SimX 读回 42。下一课保留这条启动链，只扩展线程计算。完整阶段出口仍需逐步替换手工桥接并回填 T04/T06 对应验收。
+| 小实验 | 操作 | 保存和判断什么 |
+|---|---|---|
+| L03.1 | 查询设备、分配 4 字节输出，取得设备地址；输出先置为非 42 | host 指针、设备地址、初始值有区别 |
+| L03.2 | 给 L02 的逻辑 body 加教学用 IR wrapper，参数区为一个 8 字节设备地址 | wrapper 的 a0 是参数区指针，body 的 out 是解包后的地址 |
+| L03.3 | 建立 native 入口 alias/保留规则，链接 startup、库和脚本，打包 vxbin | program_pc/kernel_pc/args 三者；ELF、BSS、导出表 |
+| L03.4 | 用你写的小型 SDK host 加载并启动，再按依赖读回 | 来自本次镜像的 42；所有 SDK 返回值检查 |
+| L03.5 | 改写入值并重新生成镜像，重复运行 | 结果跟随新输入，排除加载旧镜像；记录 O0/O2 与工具来源 |
 
-store42 函数体只需要普通 RISC-V 运算/访存，专用指令来自执行环境：当前 startup 收尾使用 WSYNC 和 TMC。正式迁移时补齐其所需支持；若本课暂时复用参考 startup 或用现有 `.insn` 发出编码，应明确这是桥接/原始编码通路，不等于新后端已具备相应助记符、intrinsic 和自动生成能力。
+初期允许手写 wrapper/alias 和复用固定的 startup、静态库、LLD、打包器。教学桥接要逐项标记；L05 再自动化这些步骤。**在 IR 层 wrapper 调用逻辑 body**，不等于允许在设备 C++ 源码里直接调用 __global__ 函数；后者受 HIP 语义限制。
 
-本阶段小步骤：① 固定指针参数区布局；② 编写单参数区入口 wrapper 调用逻辑 HIP body；③ 检查 ELF、入口表和打包；④ 用 SDK host 分配/启动/读回；⑤ 改写入值或输入指针，验证结果确实来自本次镜像。
+store42 的 body 使用标准访存。TMC/WSYNC 来自启动/收尾环境；复用参考对象或 .insn 通路不算新 LLVM 已完整支持这些指令。不要为了看到 GPU 助记符而修改正确的 store 函数体。
 
-退出条件：一个 block、一个线程的 store42 由新 LLVM 编译函数体，在 SimX 读回 42；记录 program_pc/kernel_pc/args、工具与库来源、真实退出码和产物身份。明确哪段 wrapper/启动仍手写或复用。此时不声称 <<<>>> 已自动打通。
+**停下来的条件。** 若 alias 被删除、两个 PC 不匹配或 a0 指向错误布局，先修复这一层；没有真实读回 42 就不要扩到多线程。现有 run-kernel.sh 只接受 demo/sgemm 约定，不能直接启动这份 8 字节参数 ABI 的任意镜像。
+
+**出口。** 新 LLVM 编译的 body 在 SimX 得到正确结果，来源、参数字节和链接依赖清楚。手工 host/入口仍允许；这不是自动 HIP 运行流程。
+
+<a id="l04"></a>
 
 ### L04：扩成多线程 vecadd，并正确处理边界
 
-#### 4.1 先做没有尾部判断的程序
+**问题。** 每个线程的索引来自哪里？只增加一个边界判断，为什么会引入 SIMT 正确性问题？沿用 L03 的显式启动链。
 
-先让每个线程写自己的索引，再做无尾部判断的 vecadd，例如 N=32、block=8。此时引入 threadIdx/blockIdx/blockDim、CTA CSR 和 builtin，按需要补 CPU/features、intrinsic 与 MC 指令。
+| 小实验 | 最小输入变化 | 预期结果与排查重点 |
+|---|---|---|
+| L04.1 | 每线程写 gid；先做 1D，再单独测试合法 2D 坐标 | CTA CSR 对应正确，不用 lane ID 代替 threadIdx |
+| L04.2 | 无尾部判断 vecadd，N=32、block=8、grid=4 | 32 个输出与 CPU 一致，无需为普通加法新造 opcode |
+| L04.3 | 改成 N=37、block=8、grid=5，并加 if(i<n) | 最后 warp 内确实有混合 lane；输出尾部哨兵保留 |
+| L04.4 | 同样输入分别 O0/O2；再加单臂 if 的分支后共同写回 | mask/汇合正确，检查 IR→MIR→最终汇编 |
 
-自己完成：解释每个线程写哪里，验证 1D/2D 坐标和多 block，确保所选规模每个线程都访问合法范围。普通算术继续复用 RISC-V；不要为 vecadd 的加法单独发明 GPU 指令。
+源码按 `vx_spawn2.h 的 CTA 包装 → CSR 地址/语义 → Clang builtin/IR → RISCV lowering/TTI → SIMT pass/pipeline` 阅读。threadIdx 的读取主要复用标准 CSR 指令编码；新增的是目标语义和编译连接，不必新造读取坐标的 opcode。
 
-threadIdx 的核心连接是 Vortex CTA CSR→设备 builtin/LLVM IR→标准 CSR 访问。它可以需要新增 CSR 名称、intrinsic 或 lowering，但不必新增一个“读取 threadIdx”的机器 opcode。将这类目标语义适配与 TMC 等自定义编码分开验收。
+对实际存在的分歧控制流，补齐 SPLIT/JOIN 及所需控制变体、分歧来源分析和汇合变换。不是“源码出现 if 就机械插一对指令”；优化可能消除/改写分支，最终应按语义与真实机器控制流判断。查 select/custom inserter 等晚期展开，不能只看 IR 中出现了 split/join。
 
-#### 4.2 再增加一个边界判断
+使用合法的输入缓冲区和较长的输出哨兵区，检查全部有效输出以及未激活 lane 不写尾部。当前每 warp 4 thread，N=37/block=8 的最后一个 warp 有 1 个有效 lane 与 3 个无效 lane。记录实际配置，不将这个数字写成所有 Vortex 的固定限制。
 
-将输入改为 N=37，并增加 `if(i<n)`，使同一 warp 内同时有有效/越界 lane。由这个具体变化引出 divergence、active mask、split/join、汇合点和 uniformity。
+**出口。** 多线程和带边界 vecadd 在 O0/O2 均正确；不支持的 CFG/调用要明确限制。if/else、嵌套、循环和提前退出继续按 T05 增量回归，不要求在首个 vecadd 前一次完成；但任何实际已产生的未支持分支不能被静默放过。
 
-自己完成：先实现 vecadd 所需的边界分支，再逐项增加 if/else、嵌套、循环和提前退出作为 T05 回归；完整控制流组的验收不压在第一个 vecadd 之前。用哨兵验证无越界写入，保存 O0/O2 的 IR、MIR/汇编与结果；追查 select 等晚期展开是否产生额外分支。暂不支持的结构明确诊断，不能跳过转换后默默运行。
-
-本课补 SPLIT/JOIN（以及实际 lowering 需要的 SPLIT.N/PRED 等），并打通 intrinsic、指令选择和分歧转换。从源程序自动生成控制序列，是比 L02 的 MC 编码更高一层的目标。BAR 在 L06 的目标程序需要 block 同步时引入；无需为了首个单线程结果提前搬入全部指令集。
-
-本阶段小步骤：按线程写索引 → N=32/block=8 的 vecadd → N=37/block=8 的尾部保护 → O0/O2 与哨兵验证。先保证这条主线正确，完整循环/复杂 CFG 支持按工程账本继续补充；未支持输入应明确限制或诊断。
-
-退出条件：新 LLVM 编译的多线程程序在 SimX 与 CPU 参考一致，最后一个 warp 确实存在混合有效/无效 lane；越界保护和已支持分支的汇合有证据。仍允许使用 L03 的显式 host 启动桥接。
+<a id="l05"></a>
 
 ### L05：接通普通 HIP 编译和启动流程
 
-复用已经正确执行的设备代码，把手工 host 改为 hipMalloc/hipMemcpy/hipDeviceSynchronize 等公开 API，冻结所选 HIP 声明版本；再接通 L01 已观察的 <<<>>> host stub、镜像注册与参数打包。
+**问题。** 怎样让用户只写普通 HIP 源码，不再手工准备 wrapper、参数 blob 和 SDK launch？输入为 [目标 HIP vecadd](#62-用户最终怎样写程序)。
 
-自己完成：逐项将教学 wrapper/参数元数据/镜像封装自动化，检查错误和资源生命周期。最终运行 [目标 HIP vecadd](#62-用户最终怎样写程序)，用户无需手工适配 native ABI；此时才达到原生 HIP 最小闭环。两个不同签名 kernel 连续启动是本课后半部分的必需回归。
+| 小实验 | 你自己实现的连接 | 对应验证 |
+|---|---|---|
+| L05.1 | 固定 HIP 声明版本，做最小 runtime 的分配/同步拷贝/释放 | 地址区间、偏移、错误返回、成功/失败路径清理；不先依赖 <<<>>> |
+| L05.2 | 用显式 module launch 封装已跑通设备镜像 | 默认队列、参数快照、buffer/module 保活 |
+| L05.3 | 自动生成 native wrapper、入口与参数描述 | 指针/标量类型与偏移一致；两个不同签名不混淆 |
+| L05.4 | 从实际 host IR 提取注册/stub/配置/launch ABI，接入 runtime | 声明、签名、调用顺序和 main 前注册一致 |
+| L05.5 | 连接 device-only jobs、链接/打包、镜像嵌入和 host 链接 | -### 与实际工具链一致，设备 CPU 不传给 x86 host |
+| L05.6 | 用 <<<>>> 跑 N=37 vecadd；补双 kernel、重复启动、错误回归 | 自动流程与显式流程同结果，launch 错误和同步错误均检查 |
 
-本阶段小步骤：① 冻结公开头文件/API 与隐式启动 ABI；② 用显式 module launch 验证 runtime；③ 生成参数描述和 native wrapper；④ 接入镜像嵌入、注册和 host stub；⑤ 用 <<<>>> 启动 vecadd；⑥ 加两个不同签名 kernel 的连续启动与错误回归。
+读取顺序为 `vortex2.h → queue/module 的实际实现 → CGCUDANV.cpp 的 host ABI → Driver/HIP 工具链 → 设备包装头`。函数名清单不能替代参数/调用约定；Clang 的通用 HIP runtime wrapper 也不能假定天然支持 RISC-V。
 
-退出条件：用户源码使用 hipMalloc/hipMemcpy/hipFree、launch 错误检查与同步，由编译入口自动完成设备编译/打包/注册/传参，在 SimX 执行 N=37 vecadd；用户不再手写参数 blob、入口 alias 或 SDK host launch。参数/入口、资源生命周期和失败行为必须有测试。
+这里的最小公开 API 包含 hipMalloc/hipMemcpy/hipFree、同步、错误查询和所需的单设备能力查询。HIP 参数数组保存的是参数值的 host 地址；runtime 按设备元数据读取并序列化，不能直接复制 void**。见 [参数例子](compiler-sim-contract.md#hip-参数布局示例拟定契约待实现)。
 
-这就是最小可用版本。不要为了进入 L06 先实现多个 stream、完整数学库或跨文件设备链接。任何编译入口名称和选项在实际实现前仍是拟定接口，不能把现有 chipStar 命令作为新链路的证据。
+**出口。** 新 LLVM 和原生 runtime 自动完成编译/封装/注册/传参并在 SimX 正确执行；用户不手写 native ABI。给出支持 API/类型/控制流矩阵，不宣称完整 HIP 兼容。hipcc-vortex 等入口名和公共选项在实现前仍是设计示意；文档没有提供假装可运行的命令。
+
+进入 L06 不要求先完成多个 stream、完整数学库、shared 或跨文件设备链接。T08.6 的更完整工程回归仍独立登记，不因最小演示通过而整组勾选。
+
+<a id="l06"></a>
 
 ### L06：移植一个已有 HIP 程序，按实际缺口完善
 
-“移植”是让已有 HIP 源码通过你的编译器/runtime 执行，并判断遇到的问题该改编译器、runtime 还是程序的设备假设。它不要求一次支持所有 HIP API，也不把全部高级能力变成前置。
+**问题。** 自写最小示例通过后，已有源码还会暴露什么差异？首先采用固定 SDK 的 [tests/hip/vecadd/main.cpp](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/tests/hip/vecadd/main.cpp)，保留 common.h、CPU 参考、输入种子和原验证标准。
 
-#### 6.1 先选择小而真实的输入
-
-第一项建议采用固定 SDK 提交中的 [tests/hip/vecadd/main.cpp](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/tests/hip/vecadd/main.cpp)，它是已有测试程序。保留来源、common.h、CPU 参考和原验证标准；区别于 L05 自己写的最小演示。先列依赖，再改构建入口，不要求先移植大型框架。
-
-2026-11-18 对该固定提交的本地源码静态核对：除分配/拷贝/同步/释放外，host 还调用 hipGetDevice、hipGetDeviceProperties，并依据 hipDeviceProp_t.maxThreadsPerBlock 调整 block；包含 hipGetErrorString 和 host C++ 标准库。kernel 只需 1D 索引、加法和边界分支，不使用 shared、barrier、原子或 event。完整属性结构按所选 HIP 版本保持 ABI，不能为了一个字段截短公开结构。此记录仅为源码分析，没有新后端执行结果。
-
-其原 Makefile 使用现有 HIP 路径，不是新编译器的验收入口。复用源程序时替换工具链/链接规则，检查真实 host/device jobs、镜像和 runtime 来源；不能沿用旧产物后仅看到 PASSED 就认为移植完成。
-
-#### 6.2 每次只解决一个可复现缺口
-
-| 观察到的问题 | 应先检查哪里 | 本次应交付什么 |
+| 小实验 | 操作 | 交付 |
 |---|---|---|
-| 头文件、API 声明或符号缺失 | 固定 HIP 声明、host 链接和 runtime | 符合版本契约的实现与正/负例；不能用空函数伪造成功 |
-| 设备属性查询或 launch 尺寸错误 | 设备配置、公开属性、launch 校验 | 属性与 SimX 一致，合法规模可运行，非法规模按契约报错 |
-| 尾部结果错误/越界 | 参数布局、CSR、SIMT、最终机器分支 | 缩小后的复现、必要修复和 O0/O2 回归 |
-| 程序写死 warp/block 或依赖未支持库 | 程序假设、目标能力与实际需求 | 明确的可移植修改或后续能力任务，记录功能/算法是否变化 |
+| L06.1 | 固定来源与版本，盘点 include/API/kernel 特性/启动尺寸/验证方法 | 依赖表与未支持清单，先不改算法 |
+| L06.2 | 替换旧 chipStar 构建入口，检查新 host/device jobs、镜像与库来源 | 首次真实编译/执行结果，失败也保留 |
+| L06.3 | 把一个失败缩小到最小复现，定位声明、runtime、ABI、SIMT 或设备假设 | 能暴露错误的测试与独立小修复 |
+| L06.4 | 重跑小测试和完整程序，覆盖小规模/整块/尾部 | N=1/32/37 等合法输入，O0/O2 与 CPU 对照 |
+| L06.5 | 从干净输出目录复现并整理差异 | 原程序改动与编译器/runtime 修复分别记录，支持矩阵如实更新 |
 
-步骤是：保存首次失败 → 缩成最小复现 → 定位所属层 → 写能暴露错误的测试 → 自己修复 → 重跑小测试和完整程序。遇到某个 API 缺失不一定需要添加机器指令，按职责修改对应层。
+固定 vecadd 的静态依赖不仅是内存 API：host 还调用 hipGetDevice、hipGetDeviceProperties、hipGetErrorString，根据 maxThreadsPerBlock 调整 block，并使用 host C++ 标准库；kernel 不用 shared、barrier、原子或 event。属性结构必须符合所选 HIP 版本的完整 ABI，不能截短为一个字段。原 Makefile 仍走参考 HIP 路径，复用源码不等于复用原执行证据。
 
-退出条件：固定来源的已有程序经新链路在 SimX 执行，与 CPU 参考一致；覆盖合法的小规模、整块与非整块输入（如 N=1/32/37），并保存原验证结果、优化级别、配置、源码 diff 和工具/库来源。程序改动与后端/runtime 改动分别说明；不以新算法替代原任务。完成第一项即可形成移植里程碑，不要求下面的候选全部通过。
+每次依次做“保存失败 → 最小复现 → 定位层次 → 增加测试 → 自己修复 → 完整回归”。缺少 API 不一定需要新增机器指令；程序写死的 block/warp 假设也可能需要可移植修改。不要用空函数返回成功或替换成新算法来宣称移植完成。
 
-#### 6.3 然后根据下一个程序扩展
+**出口。** 第一个固定来源的已有 HIP 程序由新链路在 SimX 与 CPU 参考一致；记录改动、版本、配置、错误与结果。这里即可形成首个移植里程碑，后面的候选按需选择：
 
-| 下一个需求/程序 | 才引入的能力 | 对应工程验收 |
+| 后续程序/需求 | 需要补齐的能力 | 任务范围 |
 |---|---|---|
-| 已有朴素 SGEMM | 2D 索引、循环、浮点与边界；先检查其实际依赖 | T03/T05/T07/T08 的相关子项 |
-| reduction、tiled SGEMM | 静态/动态 shared、BAR、block 内可见性与重排约束 | T09 |
-| histogram | 匹配硬件配置的整数 atomicAdd、竞争与内存顺序 | T10 原子子项 |
-| 多段数据依赖/流水线 | stream/event、队列顺序与异步对象生命周期 | T10 异步子项 |
+| 已有朴素 SGEMM | 2D 索引、循环、浮点、边界；读源码确认依赖 | T03/T05/T07/T08 的相关子项 |
+| reduction、tiled SGEMM | shared、BAR、block 内可见性与重排约束 | T09 |
+| histogram | 匹配 A 配置的整数 atomicAdd、竞争与内存顺序 | T10 原子子项 |
+| 多段数据依赖 | stream/event、队列顺序、异步对象生命周期 | T10 异步子项 |
 
-固定 SDK 的 tests/hip/sgemm/main.cpp 是朴素实现，本地静态核对未使用 shared/barrier；不能因名字是 SGEMM 就预设必须先实现分块共享内存。需要哪项以源码为准。后续 reduction 要用跨 warp 规模，检查每 block 共享区隔离、合法 barrier 参与和内存可见性；仅替换成 BAR 助记符不够。
-
-原子实验前要让模拟器、runtime 和 device 编译的 A 配置一致，当前参考配置默认关闭 A。优先复用标准 A 扩展 lowering；stream/event 只在目标程序需要时扩展，不以 SDK 有 queue 就宣称完整 HIP 异步语义。
-
-从干净输出目录复现、支持矩阵、错误分类和实际产物身份是每个执行里程碑的要求，不能延后到所有功能做完才检查。完整工程交付仍按 66 项账本逐项验收；第一轮不必完成未使用的 T09/T10。
+固定 SDK 的朴素 SGEMM 没有使用 shared/barrier，不能只凭名称要求先实现 T09。原子实验要单独构建匹配 A 的 simulator/runtime/device；当前默认关闭 A。设备库、warp 操作、真实硬件和性能优化继续按专题扩展，不是这次移植的全部前置。
 
 <a id="backend-timing"></a>
 
@@ -222,7 +200,15 @@ threadIdx 的核心连接是 Vortex CTA CSR→设备 builtin/LLVM IR→标准 CS
 
 2026-11-18 使用现有参考 Clang 20.1.8 核对了预处理、属性 AST、host→device 非法调用、device→host 非法调用、RISC-V device IR 和 <<<>>> AST。合法观察命令退出 0，两个非法调用退出 1 并给出 target 调用诊断；device IR 中可见 store i32 42，launch AST 中可见 CUDAKernelCallExpr。
 
-这些结果只证明参考编译器的隔离前端能力，不是 LLVM 23、新的 driver、Vortex kernel ABI 或 SimX 执行的新通过记录。后面所有“自己完成”仍是留给你的实现任务。本次没有替你修改编译器/runtime。
+上述 2026-11-18 记录只证明当时参考编译器的隔离前端能力；下面单独补记新 Clang 的观察，不把两次记录混成设备执行证明。课程中的编译器/runtime 实现仍由你完成。
+
+2026-11-19 再核对：LLVM 仓库 HEAD 为 `c447d813c43ffd97e973c7e582175a60286c1b50`（用户提交“完成L01的教程”）；保留其 `llvm/unittests/Vortex/101/` 输入与脚本。新 Clang 23.1.4 可用，--version 中嵌入的编译修订仍为原始基线 `7a941dfb...`，与后来提交实验文件的源码 HEAD 分开记录；四个构建目标均可查询。
+
+本目录标准夹具用 Clang 23 与参考 Clang 20 验证（最终脚本各执行一次），七项前端观察均通过。证据分别在 `/home/kaikai/vortex-word/artifacts/tutorial/l01/run-jpow1h7p/report.json` 和 `run-1p_l56x3/report.json`；这些是本机产物，不在文档仓库中。新 Clang 中两个函数都可能带 uniform-work-group-size，这不是 Vortex kernel 标识。
+
+用户原实验脚本的 +f 重复一次，应以本教程的 +m/+f/+d 与 lp64d 配套命令重做；本次没有修改你的 LLVM 源码/提交。该路径里的手工脚本尚不等于被 lit/CMake 注册的测试。未来编译器回归应分别放入 Clang CodeGen/Sema/Driver 或 LLVM MC/CodeGen/Transforms 的对应测试目录。
+
+本轮还逐条执行了 L01 手工命令；用新 LLVM verifier 检查 L03 的示意 wrapper 结构，并用 rv64imfd/lp64d 生成标准 add 的汇编和 IR。wrapper 尚未链接或在 SimX 执行。这些证据不自动完成整组工程任务；目前没有本轮新 Vortex 后端设备镜像执行通过记录。
 
 ### 0.4 旧课程与六阶段的对应关系
 
@@ -257,14 +243,14 @@ threadIdx 的核心连接是 Vortex CTA CSR→设备 builtin/LLVM IR→标准 CS
 
 ## 2. 固定基线，防止学习对象不断变化
 
-以下是 2026-11-17 已记录的 WSL 环境快照；本次文档整理未重新执行完整 LLVM 构建或 SimX smoke。开始学习时按 [起步任务](getting-started.md) 核对实际状态。构建命令见 [build.md](build.md)，产物与执行接口见 [compiler-sim-contract.md](compiler-sim-contract.md)。
+以下保留 2026-11-17 的版本基线，并注明 2026-11-19 的工具与源码核对；没有重跑完整 LLVM 构建或五项 SimX smoke。开始学习时按 [起步任务](getting-started.md) 核对实际状态。构建命令见 [build.md](build.md)，产物与执行接口见 [compiler-sim-contract.md](compiler-sim-contract.md)。
 
 | 对象 | 当前基线 | 教程中的作用 |
 |---|---|---|
-| 新编译器 | `/home/kaikai/vortex-word/llvm-project`，`dev/vortex`，`llvmorg-23.1.4`，`7a941dfb2877a0b8cf30323fefa85ad019e0b0f5` | 你实现的主体 |
+| 新编译器 | `/home/kaikai/vortex-word/llvm-project`，`dev/vortex`，`llvmorg-23.1.4` 基线 `7a941dfb...`，2026-11-19 源码 HEAD `c447d813c...` | 你实现的主体；与二进制内嵌修订分开记录 |
 | Vortex SDK/SimX | `/home/kaikai/vortex-word/vortex`，`26d2bc4b5409a35a111e8316ac3a87d07b15fc80` | 固定执行端、ABI 与测试输入 |
 | 官方参考编译器 | `/home/kaikai/vortex-word/tools/llvm-vortex`，Clang 20.1.8，`f44a6bb2af4c62847585305bbdc760fbe0e3645f` | 对照 IR、汇编和执行结果 |
-| 新编译器构建目录 | `/home/kaikai/vortex-word/build/llvm` | 已配置；本次检查尚无 clang/llvm-mc 成品 |
+| 新编译器构建目录 | `/home/kaikai/vortex-word/build/llvm` | 2026-11-19 查询到 Clang 23.1.4、四个 target 和 MC/FileCheck/lit 工具；完整构建日志另行留证 |
 | 参考 SDK 构建目录 | `/home/kaikai/vortex-word/vortex/build64` | 已有 SimX、runtime 与 smoke 基线 |
 
 当前 `build.sh` 配置 AMDGPU、RISCV、NVPTX、X86。它们用于阅读和对照；Vortex 开发主体在 RISCV 与 Clang HIP 接入处，不需要新建 `llvm/lib/Target/Vortex`。构建这些后端也不等于安装了 AMD/NVIDIA 的 HIP runtime。
@@ -331,7 +317,7 @@ SDK [vortex2.h](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8
 | T09 | shared memory 与 barrier | 地址空间/对象布局、local memory、barrier lowering/runtime | 跨 warp reduction 与 tiled sgemm 正确，静态/动态共享内存均有测试 |
 | T10 | 原子与 stream/event 扩展 | A 扩展、memory ordering、队列/event 映射 | 开启匹配硬件配置后 atomicAdd 正确；多 stream 顺序与事件依赖正确 |
 
-原工程链 `T00 → T01 → T02 → T03 → T04 → T05 → T06 → T07 → T08 → T09 → T10` 保留为完整能力出口的保守核对顺序。学习按第 0 节课程推进，可以先做 frontend 隔离实验和跨分组的局部实现；例如输出设备 IR 不要求先实现 HIP runtime。声称设备执行或某组完整通过时，必须补齐相关 CPU/ISA/ABI/runtime 依赖，不能把观察实验当成全组通过。
+工程组按能力核对依赖，而不是要求整组串行完成。runtime 底座可在兼容 native 镜像可用后开始，不必先完成全部分歧/循环；原子与 stream/event 也不依赖 shared/reduction 全部完成。最小依赖表见 [任务账本](tasks.md#task-dependencies)。局部实现可跨组推进；声称完整组通过仍要逐项满足该组验收，不能用观察实验代替执行。
 
 每组保留 6 项工程任务，详见 [任务卡目录](tasks.md)。第一阶段以观察和小练习为主；首次源码修改后按实际变化提交，测试检验新增语义或错误行为。既有任务状态不因授课重排而重置。
 
@@ -349,7 +335,7 @@ SDK [vortex2.h](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8
 
 ### T02：特殊指令的 MC 支持
 
-只做四条 MC 指令，不在这个提交里移植分歧 pass 或添加 HIP runtime。
+这一能力组覆盖四条 MC 指令，每条可单独提交并按课程需要完成；不在某一条指令的提交里同时移植整个分歧 pass 或添加 runtime。
 
 1. 复用 T01 已建立的 `xvortex` 开关，为扩展指令文件接入 feature 谓词。
 2. 对照官方 td 和 SimX/RTL，明确每条指令的 opcode、funct3、funct7、固定 rd/rs2、输入输出寄存器。
@@ -505,11 +491,14 @@ int main() {
 
 ## 7. 开发前审阅结论与验收矩阵
 
-审阅日期：2026-11-18。主线架构继续采用 RISCV Target + mcpu=vortex；本轮完善边界、依赖与测试，不新增任务编号或后端实现。P0 表示对应里程碑通过前必须解决，P1 表示该能力引入时落实。
+审阅日期：2026-11-18；教程与依赖复核：2026-11-19。主线架构继续采用 RISCV Target + mcpu=vortex；本轮完善边界、依赖与测试，不新增任务编号或后端实现。P0 表示对应里程碑通过前必须解决，P1 表示该能力引入时落实。
 
 | 优先级 | 原有不足/需要确认的细节 | 本轮补充与必须交付的证据 | 对应任务 |
 |---|---|---|---|
 | P0 | 顶部旧注释仍描述不同的启动模型 | 分开 program_pc/kernel_pc/args，按实际代码、DCR、ELF 核对；两个 kernel 交替启动 | T04.1～T04.6 |
+| P0 | 把 IR 中缺少专用指令误判为前端失败 | 区分通用属性/逻辑 kernel/native 入口；store42 不要求 SPLIT/JOIN；正反例覆盖 marker | L01/L02、T03.5/T07.4 |
+| P0 | CPU 默认能力与 SDK 参数混淆 | 明示参考 rv64imafd 含 A、SimX 默认 A/C 关闭；新默认按实际配置，审计库和镜像 | T01.1/T01.6、T04.3 |
+| P0 | 工程依赖被写成全部串行前置 | 以任务账本的能力依赖推进，保留六阶段与原有任务状态 | 各阶段 |
 | P0 | 单看入口 alias 或文件存在不足以证明可执行 | 验证公共入口、镜像基址、BSS 范围、入口表和 CTA slot 复用 | T04.2～T04.6 |
 | P0 | O0 必需转换与优化 pipeline 的关系不具体 | optnone 下不漏跑 SIMT；O2 后不破坏 mask/CFG；失败有最小 IR | T03.1、T05.1～T05.5 |
 | P0 | IR 转换之后仍可能出现新分支 | 检查 select/custom inserter 等机器级展开，保存 MIR/最终汇编与混合 lane 执行结果 | T03.6、T05.5 |
@@ -527,6 +516,6 @@ int main() {
 
 更详细的冻结点见 [架构实现契约](architecture.md#implementation-contracts)，启动与参数例子见 [compiler-sim-contract.md](compiler-sim-contract.md)。
 
-审阅建议的先后顺序是：先冻结 native 启动与 ABI，验证一个可运行切片，再完善 SIMT；进入 HIP 前确定头文件/设备库/参数格式；接 host stub 时同时做错误与资源生命周期测试。共享内存、原子及异步继续按既有阶段增加，不把可选能力提前变成首个闭环的必要前置。
+审阅建议的先后顺序是：先冻结 native 启动与 ABI，验证一个可运行切片，再完善 SIMT；在首次设备链接前确认所用库，进入公开 HIP runtime/自动流程前确定声明、包装头和参数格式；接 host stub 时同时做错误与资源生命周期测试。共享内存、原子及异步继续按既有阶段增加，不把可选能力提前变成首个闭环的必要前置。
 
 本轮文档审阅不等于矩阵各项已通过。源码核对、布局检查、参考工具结果和实际新后端执行分别记录，后续直接回填现有任务证据。

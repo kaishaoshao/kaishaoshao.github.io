@@ -1,6 +1,6 @@
 # LLVM 23 HIP/Vortex：66 项工程验收账本
 
-更新日期：2026-11-18（Asia/Shanghai）。配套总览：[教程与最终成果](plan.md)。本文件是任务设计，不是已完成清单；任务进度以实际证据为准，文档修订不重置既有状态。
+更新日期：2026-11-19（Asia/Shanghai）。配套总览：[教程与最终成果](plan.md)。本文件是任务设计，不是已完成清单；任务进度以实际证据为准，文档修订不重置既有状态。
 
 工程分组仍对应 [CPU/subtarget 架构方案](architecture.md)，共 11 组、66 项，全部 T00～T10 ID 保持不变。授课改按 [六阶段主线](plan.md#tutorial-route) 从语法/AST/Sema/IR 开始；本文件用于查阅和逐项验收，不要求按 T00 到 T10 的目录顺序开始学习。
 
@@ -17,6 +17,30 @@
 验收分层：MC 编码测试不能替代 SIMT 执行测试，IR 检查不能替代参数 ABI 验证，SimX 执行成功不能替代 host 注册与资源生命周期检查。暂不支持的输入应有明确诊断或限制，避免静默误编译。
 
 本轮审阅补充的契约见 [架构方案第 7 节](architecture.md#implementation-contracts) 与 [启动/参数契约](compiler-sim-contract.md)。下面新增的验收细节保留全部 66 个任务 ID；已经有执行证据的任务只需复核新增条件，不重新标成待做。优先补齐两个 PC、O0 必需转换、HIP 包装头/设备库和参数布局，再扩展功能。
+
+<a id="task-dependencies"></a>
+
+## 能力依赖和课程回填
+
+这里的前置是“用到的能力已可用”，不要求对应 Txx 整组全部完成。首次学习顺序仍为 L01～L06；例如可以先读 HIP AST，也可以在一个 native 镜像可运行后开始 runtime，不必先完成所有分歧循环。
+
+| 工程组 | 最小依赖（按相关子项） | 与课程的关系 |
+|---|---|---|
+| T00 | 无；已有 Bash/Git 与环境 | L01 先记录版本，L02 构建，L03 执行前核对 SDK |
+| T01 | T00 的标准编译器/配置知识 | L02 CPU/feature |
+| T02 | T01 feature、固定执行端编码 | L02 TMC；L04 SPLIT/JOIN；L06 按需 BAR |
+| T03 | T01 选项与对应 T02 指令；标记观察可更早独立做 | L02 逻辑标记，L04 builtin/IR/SIMT 基础 |
+| T04 | T00 的 SDK 基线、T01 配置、T02 启动所需指令、T03 入口信息 | L03 先用桥接跑 store42；完整 native 组另验 |
+| T05 | T03 分歧/控制语义、T04 执行链 | L04 按实际控制流逐项实现 |
+| T06 | T00 SDK 基线、T04 兼容镜像 | L05 runtime 底座；不依赖 T05 全部完成 |
+| T07 | T00 前端观察、T01/T03 设备语义、T04 ABI；T06 用于执行验收 | device-only 分层接入可从 L02～L04 开始 |
+| T08 | T06 runtime、T07 device 链；分歧样例用到 T05 | L05 自动 HIP 流程与相关子集回归 |
+| T09 | T03 屏障语义、T04 ABI；完整 HIP 样例用到 T08 | L06 有 block 协作需求才引入 |
+| T10 | T01 的匹配原子配置、T06 runtime、T08 HIP 链 | 原子/stream/event 分别开展，不以 T09 全部完成为前置 |
+
+各组完整出口仍保留原有六项要求。L03 手工 wrapper 通过不完成 T07.4 自动生成；L05 最小 vecadd 通过不自动完成 T08.6 全部类型/样例；L06 首个移植也不等于 T09/T10 已完成。
+
+进度与历史证据统一见 [plan.md 第 0.3 节](plan.md#03-已核对的教学实验与证据边界)。用户已提交的 L01 文件和新编译器观察记录保留；不因依赖修正重置状态。配置/标记表述的澄清影响 T01.1/T01.6、T03.5、T04.3/T07.4 的核对方式；已有报告补充实际能力/ABI说明即可，不能无依据改写为已通过。
 
 ## 源码导航
 
@@ -42,13 +66,13 @@
 | V5 | SDK `sw/kernel/scripts/vxbin.py` | 镜像格式与入口表 |
 | V6 | SDK [vortex2.h](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/sw/runtime/include/vortex2.h)、`sw/runtime/common` 对应实现 | buffer、module、queue、event 与生命周期 |
 | V7 | SDK `tests/hip/common.mk`、`tests/hip/vecadd`、`tests/hip/sgemm`；[现有 HIP 设计](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/docs/designs/hip_on_vortex_chipstar.md) | 对照现有 chipStar 路径与测试行为 |
-| W1 | 工作区 `scripts/{run-smoke.sh,validate-compiler.sh,run-kernel.sh,inspect-kernel.py}` | 基线、编译器替换范围与产物检查 |
+| W1 | 工作区 `scripts/{env.sh,build-simx.sh,run-smoke.sh,validate-compiler.sh,run-kernel.sh,inspect-kernel.py}` | 基线、编译器替换范围与产物检查 |
 
 SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过固定提交链接阅读。不要因文件未检出就判定官方没有实现。编译器参考 fork 也不是本地 LLVM 23 的一部分。
 
 ## 阶段 T00：构建与 ABI 基线
 
-前置：能在 Bash 使用 Git、CMake、编译器。按 [TASK-000 操作命令](getting-started.md)完成本阶段；每个小任务单独留证据。退出条件：知道哪些结果来自参考工具链，哪些来自新 LLVM。
+前置：能在 Bash 使用 Git、CMake、编译器。按 [T00 工程基线附录](getting-started.md#engineering-baseline)完成本阶段；每个小任务单独留证据。退出条件：知道哪些结果来自参考工具链，哪些来自新 LLVM。
 
 ### T00.1 固定版本和能力
 
@@ -59,14 +83,14 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ### T00.2 构建四目标 LLVM
 
-- 目标/阅读：阅读工作区 `docs/llvm-build.md` 和 LLVM 根目录 build.sh，理解源码/构建/安装目录。
+- 目标/阅读：阅读本目录 [build.md](build.md#llvm-build) 和 LLVM 根目录 build.sh，理解源码/构建/安装目录。
 - 练习：完成构建，取得 clang、llc、opt、llvm-mc、llvm-objdump、FileCheck；记录 targets-built。
 - 验收：LLVM 23 版本正确，AMDGPU/RISCV/NVPTX/X86 均在构建目标中，构建退出码为 0。
 - 交付/排查：构建日志与工具清单。tee 使用 pipefail；内存不足降低并行度，不改后端规避构建错误。
 
 ### T00.3 认识标准 RV64 编译链
 
-- 目标/阅读：阅读 RISC-V 目标输出和 TASK-000 的 add.c，区分源码、IR、汇编、对象与可执行镜像。
+- 目标/阅读：阅读 RISC-V 目标输出和 T00 附录的 add.c，区分源码、IR、汇编、对象与可执行镜像。
 - 练习：用新 Clang 生成 add.ll/add.s，标出 triple、DataLayout、参数和返回值。
 - 验收：不依赖 Vortex feature 或设备 libc，能解释为什么当前产物还不能直接作为完整 kernel 执行。
 - 交付/排查：两个产物与短注释；若出现 host 汇编，先核对 --target 和实际 compiler 路径。
@@ -89,19 +113,19 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 - 目标/阅读：阅读 W1/validate-compiler.sh，列出它替换与复用的组件。
 - 练习：整理 MC、IR、镜像、runtime、执行各层测试；可选尝试未扩展 LLVM 的验证并记录第一处实际错误。
-- 验收：提交 TASK-000 中七个问题的回答；能解释“参考系统可跑”和“新编译器已可跑”的区别。
+- 验收：提交 T00 附录中七个问题的回答；能解释“参考系统可跑”和“新编译器已可跑”的区别。
 - 交付/排查：evidence.md 和下一阶段测试计划。这里不要求未扩展 LLVM 通过 native 验证。
 
 ## 阶段 T01：Vortex CPU/subtarget 与选项契约
 
-前置：T00 通过；理解 Target、CPU、ISA extension、ABI 的区别。公共入口 R9/R6/R1。本阶段让工具正确选择 Vortex 配置，尚不实现四条特殊指令。首版固定 RV64，默认配置对齐现有 SimX。
+前置：T00 的编译器与配置基线可用；理解 Target、CPU、ISA extension、ABI 的区别。公共入口 R9/R6/R1。本阶段让工具正确选择 Vortex 配置，尚不实现四条特殊指令。首版固定 RV64，默认配置对齐现有 SimX。
 
 ### T01.1 写下 CPU、ISA、ABI 和设备边界
 
 - 目标/阅读：阅读 R9 的 ProcessorModel/DefaultMarch、架构方案第 6.2 节的标准扩展配置和 T00 能力表。
 - 练习：定义名称 vortex、位宽、标准扩展、xvortex、基础 ABI、保守调度选择；列出 CPU 默认能力与可选配置。
 - 验收：明确 -mcpu 不表示源文件自动变成 HIP 或所有函数都变成 kernel；host x86 与设备 RV64 配置分开。
-- 交付/排查：CPU 契约与选项组合表。默认 ISA 不夹带当前 SimX 未启用的 A/C，不虚构精确性能参数。
+- 交付/排查：CPU 契约与选项组合表。默认 ISA 不夹带当前 SimX 未启用的 A/C，不虚构精确性能参数；记录参考 Makefile 的 rv64imafd 含 A 这一配置差异，不能当作新 CPU 默认值照抄。
 
 ### T01.2 建立 xvortex feature 与 ISA 解析
 
@@ -140,7 +164,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T02：MC 指令切片
 
-前置：T01 通过；理解寄存器、R 型编码、TableGen 基本语法。公共入口 R1/V1。所有指令按当前执行端核对位字段；本阶段验证 CPU 默认路径和显式 -mattr 路径共同约束特殊指令。
+前置：T01 的 feature/ISA 选择可用；理解寄存器、R 型编码、TableGen 基本语法。公共入口 R1/V1。所有指令按当前执行端核对位字段；本阶段验证 CPU 默认路径和显式 -mattr 路径共同约束特殊指令。
 
 ### T02.1 建立编码对照表
 
@@ -187,7 +211,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T03：IR、CSR、uniformity 与 Clang feature
 
-前置：T02 通过；理解 SSA、intrinsic 属性和优化重排。公共入口 R2/R3/R4/R6/V2。重点是语义，不是“让 llc 不报错”。
+前置：T01 配置和本次使用的 T02 指令路径可用；理解 SSA、intrinsic 属性和优化重排。公共入口 R2/R3/R4/R6/V2。重点是语义，不是“让 llc 不报错”。
 
 ### T03.1 设计最小 intrinsic 契约
 
@@ -224,7 +248,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 - 目标/阅读：阅读 V2 的 vortex.uniform/kernel、R3/R4，以及相关 Clang annotation 发射代码。
 - 练习：追踪 annotation 到 IR，再设计分析/转换中的消费方式；文档写明当前保留或尚未使用的标记。
 - 验收：测试 O0/O2 下信息的存续及实际用途；普通 RISC-V 不进入 Vortex 专用逻辑。
-- 交付/排查：pipeline 图与 IR 测试。这里处理信息传递，完整 kernel alias 在 T04，CFG 变换在 T05。
+- 交付/排查：pipeline 图与 IR 测试。这里处理信息传递，完整 kernel alias 在 T04，CFG 变换在 T05。逻辑 HIP kernel 标记不等于 native vortex.kernel 入口；通用 uniform-work-group-size 属性不能作为唯一判据。
 
 ### T03.6 验证 CPU 选择贯穿 IR 与代码生成
 
@@ -235,7 +259,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T04：native kernel 可运行
 
-前置：T03 通过；理解 ELF、链接、栈与参数 ABI。公共入口 R5/V3/V4/V5/W1。先复用固定参考设备库和链接工具，明确每个对象的编译来源。
+前置：参考 SDK 可用，CPU/启动所需指令和入口信息可用；理解 ELF、链接、栈与参数 ABI。公共入口 R5/V3/V4/V5/W1。先复用固定参考设备库和链接工具，明确每个对象的编译来源。
 
 ### T04.1 写下 native kernel ABI 契约
 
@@ -287,7 +311,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T05：SIMT 分歧与重新汇合
 
-前置：T04 通过；理解 dominator/postdominator、SSA/PHI、循环与 active mask。公共入口 R3/R4/R2/V1。本阶段只给已有硬件语义生成正确程序，不通过改变 SimX 指令语义来适配错误 lowering。
+前置：兼容 native 镜像的执行链可用，T03 控制/分歧语义可见；理解 dominator/postdominator、SSA/PHI、循环与 active mask。公共入口 R3/R4/R2/V1。本阶段只给已有硬件语义生成正确程序，不通过改变 SimX 指令语义来适配错误 lowering。
 
 ### T05.1 拆解官方分歧流水线
 
@@ -337,7 +361,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T06：原生 runtime 底座
 
-前置：T05 通过；理解 host/device 地址、对象所有权与同步。公共入口 V6/V3/W1。建议单独建立 hip-vortex 项目；此时显式 module launch，不依赖自动 host stub。
+前置：T04 的兼容镜像和 SDK 接口可用，不要求先完成所有 T05 控制流；理解 host/device 地址、对象所有权与同步。公共入口 V6/V3/W1。建议单独建立 hip-vortex 项目；此时显式 module launch，不依赖自动 host stub。
 
 ### T06.1 设计设备上下文和错误模型
 
@@ -386,7 +410,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T07：HIP device-only 编译
 
-前置：T06 通过；理解 HIP host/device 函数、Clang target/ABI、类型布局。公共入口 R6/R7/R8/V2。最终产物必须直接走 RISC-V/Vortex，现有 SPIR-V 路径只作对照。
+前置：HIP 前端观察、CPU/设备语义和 native ABI 可用；完整执行验收需要 T06 的显式启动；理解 HIP host/device 函数、Clang target/ABI、类型布局。公共入口 R6/R7/R8/V2。最终产物必须直接走 RISC-V/Vortex，现有 SPIR-V 路径只作对照。
 
 ### T07.1 接入已确定的 Vortex CPU 到 HIP device jobs
 
@@ -415,7 +439,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 - 目标/阅读：结合 R8 的 kernel 函数表示、R5/V4 的 native 入口 ABI。
 - 练习：限定指针/int32/uint32/int64/uint64/float 参数，定义版本化偏移/大小/对齐元数据，生成单参数区入口 wrapper。
-- 验收：wrapper 按相同布局解包并调用 HIP 实现；混合参数顺序、padding、两个签名和零参数 kernel 有用例。
+- 验收：wrapper 在 IR/CodeGen 层按相同布局解包并调用 HIP 实现（不放宽源码直接调用 __global__ 的限制）；混合参数顺序、padding、两个签名和零参数 kernel 有用例。
 - 交付/排查：ABI 文档和 IR/布局测试；void** 只提供值的位置，不能替代类型布局元数据。
 - 补充验收：逐字节验证 [vecadd 的建议 32 字节参数区](compiler-sim-contract.md) 及不同签名；检查 pointer/scalar kind、尾部 padding、元数据版本与错误布局。示例数值需由真实目标 DataLayout/生成器再次确认。
 - 版本边界：参数/容器版本与 xvortex ISA、native ABI、Clang 隐式 host ABI 分开记录；不能只比较 ISA 名称就接受不兼容参数描述。
@@ -437,7 +461,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T08：HIP host/device 全链路
 
-前置：T07 通过；理解 host ABI、全局构造/析构、二进制容器和符号关联。公共入口 R7/R8/V6。先完成一个翻译单元，暂不引入跨文件 device linking。
+前置：T06 runtime 和 T07 device 链可用，实际用到的分歧结构有 T05 支持；理解 host ABI、全局构造/析构、二进制容器和符号关联。公共入口 R7/R8/V6。先完成一个翻译单元，暂不引入跨文件 device linking。
 
 ### T08.1 从 host IR 提取真实 HIP ABI
 
@@ -487,7 +511,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T09：shared memory 与 block 同步
 
-前置：T08 通过；理解地址空间、存储作用域、执行屏障与内存顺序。公共入口 V2/V6、Clang CodeGen、R2/R3。当前配置下使用合法且能覆盖多个 warp 的 block。
+前置：native ABI、对应屏障/内存语义可用；完整 HIP 程序验证需要 T08；理解地址空间、存储作用域、执行屏障与内存顺序。公共入口 V2/V6、Clang CodeGen、R2/R3。当前配置下使用合法且能覆盖多个 warp 的 block。
 
 ### T09.1 定义 shared memory ABI
 
@@ -534,7 +558,7 @@ SDK 当前使用 sparse checkout；尚未出现在本地的参考文件先通过
 
 ## 阶段 T10：原子、stream/event 与可复现交付
 
-前置：T09 通过；理解 atomicity/memory order、队列顺序与异步对象生命周期。公共入口 V6/V7/R2。原子配置与原默认配置分开构建和记录，避免宿主/设备/模拟器宏不一致。
+前置：可用 HIP 链与 runtime；原子部分另需匹配 A 配置，不要求 T09 全部完成；理解 atomicity/memory order、队列顺序与异步对象生命周期。公共入口 V6/V7/R2。原子配置与原默认配置分开构建和记录，避免宿主/设备/模拟器宏不一致。
 
 ### T10.1 建立 A 扩展配置
 

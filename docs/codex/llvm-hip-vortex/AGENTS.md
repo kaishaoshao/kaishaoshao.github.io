@@ -12,3 +12,7 @@
 - 记录 host/device 目标隔离、mcpu/march/feature/ABI、实际硬件配置、O0/O2 与结果依据；不以 SimX 时间推断真实硬件性能。
 - 日期使用 Asia/Shanghai；历史环境验证记录保留原日期，不能因文档更新改写成当天重新验证。
 - 仅提交本主题及必要目录索引的修改，检查相对链接、任务 ID 唯一性、阶段依赖和 git diff；不夹带其他主题的工作或生成博客资源。
+- 每阶段写清问题、固定输入、源码入口、逐步操作、预期观察/错误、交付和下一步。L01 的完整命令集中在 getting-started.md，plan.md 组织实现步骤，architecture.md/接口契约作为按需参考，避免复制相互漂移的大段教程。
+- examples/l01 的 HIP 夹具与 run_l01.py 仅验证前端观察，不实现 backend/runtime、不执行 GPU；结果存放于 WSL artifacts。check_docs.py 检查文档/任务/输入一致性；不提交生成日志/IR/report.json，也不新增重复的课程状态数据。
+- 能力依赖以 tasks.md 的依赖表为准，不要求先完成所有 SIMT 才写 runtime，也不把 shared 全部完成作为原子/异步实验前置。保留既有任务 ID/状态，范围澄清注明受影响任务。
+- 不把“缺少 Vortex native 入口契约”写成“IR 没有任何属性”；store42 不要求 SIMT 指令，通用 uniform-work-group-size 不能唯一标识 kernel。CPU 默认能力与实际配置匹配，明示参考 rv64imafd 含 A、默认 SimX A/C 关闭的差异。

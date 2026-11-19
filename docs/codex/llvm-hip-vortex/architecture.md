@@ -1,6 +1,6 @@
 # 架构方案：RISC-V 后端中的 Vortex CPU 与原生 HIP 支持
 
-修订日期：2026-11-18（Asia/Shanghai）。设计基线为 LLVM 23.1.4。本方案用于指导你实现；此文档没有创建编译器功能。
+修订日期：2026-11-19（Asia/Shanghai）。设计基线为 LLVM 23.1.4。本方案用于指导你实现；此文档没有创建编译器功能。
 
 ## 1. 已确定的结构
 
@@ -31,6 +31,26 @@ HIP 输入
 | HIP frontend/CodeGen | HIP 属性/语义、builtins、设备类型/地址空间 | 复用 Clang HIP，增加 Vortex 适配 |
 | HIP driver | host/device jobs、设备链接、镜像封装、host 链接 | 增加拟定 HIPVortex toolchain |
 | Runtime | 镜像注册、内存、启动、同步及资源生命周期 | 独立 hip-vortex 项目 |
+
+
+<a id="hip-ir-bridge"></a>
+
+### 1.1 从 HIP IR 到 Vortex 执行，桥梁具体是什么
+
+先看四层，不把它们合成一个“后端有没有支持”的判断：
+
+| 层次 | 现有观察/用途 | 本教程要补什么 |
+|---|---|---|
+| AST 语言信息 | __global__ 对应 CUDAGlobalAttr，__device__ 对应 CUDADeviceAttr | 复用现有语法与调用侧检查，不重写 Parser |
+| 通用设备 IR | RISC-V triple/DataLayout、普通标量运算、函数属性 | 定义下游可稳定识别的逻辑 HIP kernel 标识及 helper 边界 |
+| native 入口与启动 | SDK 从公共 startup 进入单参数区函数 | wrapper 解包、入口 alias/保留、镜像、两个 PC 与参数契约 |
+| GPU 执行语义 | 普通标量指令在各个活跃线程的数据上执行 | CTA builtins、uniformity、分歧/汇合、同步；按输入需要引入 |
+
+“IR 中没有 Vortex 专用入口契约”不等于“IR 中完全没有属性/元数据”。本机 Clang 23 的实验已有 target-cpu/features、convergent、optnone 等属性；uniform-work-group-size 也可能同时出现在 kernel 和 helper，不能作为唯一标记。AST 属性不必原样以同名节点出现在 LLVM IR 中，关键是后续消费者取得所需语义。
+
+store42 只有普通 store，函数体不需要专用 SIMT 指令；generic-rv64 也是 L01 命令主动选择的 CPU。不能用这两个现象推导出前端没识别 HIP。L02 才增加 Vortex 编译连接，L03 建立执行入口，L04 让真正需要的线程/分歧语义正确工作。
+
+逻辑 kernel 标记可以是 IR 函数属性、annotation 或其他约定的 metadata；形式需要在实现时冻结，并有明确消费者/保留测试。它和现有 SDK 的 vortex.kernel 原生单参数区入口标记不能直接等同。源码阅读入口与最小练习见 [L02](plan.md#l02)。
 
 ## 2. -mcpu、-march、feature、ABI 的契约
 
@@ -125,6 +145,8 @@ Vortex 采用标准 RISC-V 指令处理每个线程的普通计算，通过自�
 
 `-mcpu=vortex` 是本项目待实现的处理器选择入口，`xvortex` 是能力选择。HIP 的 `__global__` 和 `<<<>>>` 是语言与启动机制，不是新增两条机器指令。
 
+<a id="isa-config"></a>
+
 ### 6.2 当前 RV64 基线使用哪些标准扩展
 
 固定 SDK 的 [VX_config.toml](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/VX_config.toml) 与 [原生测试 common.mk](https://github.com/vortexgpgpu/vortex/blob/26d2bc4b5409a35a111e8316ac3a87d07b15fc80/tests/regression/common.mk) 是配置依据。
@@ -140,7 +162,13 @@ Vortex 采用标准 RISC-V 指令处理每个线程的普通计算，通过自�
 | C | 16 位压缩指令 | 默认关闭 |
 | Zacas、Zfhmin | 原子比较交换、最小半精度支持 | 默认关闭，各自有前置条件 |
 
-在当前未启用可选扩展的 RV64 原生测试中，基础选项为 `-march=rv64imafd -mabi=lp64d`，另外通过 target feature 启用 `+xvortex` 和 `+zicond`。这描述当前参考构建方式；LLVM 23 的最终默认 ISA 字符串与扩展版本由 T01 实现并验证。
+注意实际存在的差异：参考 common.mk 写的是 `-march=rv64imafd -mabi=lp64d`，**其中含 A**；当前 VX_config.toml 默认却关闭 A/C。普通 demo 通过只能证明已执行路径，不能据此宣称原子或完整 ISA 匹配已验证。保留这个参考事实，不把它悄悄改写成没有 A 的命令。
+
+新 CPU 的默认能力应匹配所选 SimX；不使用 A/C 的标准标量实验可以显式采用 `-march=rv64imfd -mabi=lp64d`。Zicsr/Zicond 和 xvortex 的最终版本化 ISA 字符串在 T01 冻结。复用旧对象/静态库时还要检查 ELF attributes 和实际机器码；只修改新 Clang 的选项，不能清除旧库已有的 A 声明或证明其全部路径安全。严格配置对齐仍是 T01/T04 的验收项。
+
+官方 README 所说的 RV32IMAFC/RV64IMAFDC 是项目可支持的标准组合，不代表所有构建都全部开启。按规范顺序，I 是基础整数，M 是整数乘除，A 是原子，F/D 是单/双精度，C 是 16 位压缩编码；见 [RISC-V 命名规范](https://docs.riscv.org/reference/isa/unpriv/naming.html)。Vortex 专用指令和 CSR 在这串字母之外描述。
+
+RV32/RV64 控制基础整数位宽，不决定 GPU 是否可并行，也不等同浮点精度；两种配置要分别构建并匹配参数/地址/库 ABI。x86_64 host 可以管理 RV32 device，但转换规则需要单独实现。本教程初版 -mcpu=vortex 只接 RV64 是项目范围选择，不表示上游 Vortex 不支持 RV32。
 
 RV64 描述基础整数寄存器/运算宽度；本节介绍的自定义 R 型编码仍是 32 位。标准 RVV 与 Vortex SIMT 是不同机制，本教程不要求先把 HIP 线程计算转换成 RVV；也不能仅凭配置中的 VLEN 字段推断标准 V 扩展已启用。
 
@@ -256,7 +284,7 @@ printf 'vx_tmc a0\nvx_split a1,a0\nvx_join a1\nvx_bar a0,a1\n' |
 
 ## 7. 实现前要固定的边界与契约
 
-2026-11-18 审阅补充。本节细化现有 66 项任务的设计与验收，不表示这些功能已实现，也不重置任务状态。具体参数例子和两个启动 PC 见 [编译器与 SimX 契约](compiler-sim-contract.md)。
+2026-11-18 建立、2026-11-19 复核。本节按用到的能力查阅，不是第一课必须全部掌握的内容；细化现有 66 项任务的设计与验收，不表示这些功能已实现，也不重置任务状态。具体参数例子和两个启动 PC 见 [编译器与 SimX 契约](compiler-sim-contract.md)。
 
 ### 7.1 固定 host/device 平台与第一版子集
 

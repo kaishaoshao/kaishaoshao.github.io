@@ -399,9 +399,20 @@ def launch_vector_add(x, y, z, n):
 
 ### 实测基线
 
-compiler-1 固定基线：triton-coral dev/triton-coral@4f045a9d77，coralnpu dev/ncoral-hbf-3dpim@f9ab975c。已验证骨架注册与源码到 TTIR，当前 LLIR/ELF 为占位。真实单核 AOT、标准设备 JIT 与 ABI v3 固件待验收。
+compiler-1（2026-11-20）：Triton Coral 骨架与 S0-03 的正式选项已在实际工作树验证。S0-03 尚未提交。主线的 make_llir/make_elf 仍是占位接口。空 kernel 教程已用隔离构建验证，真实单核 AOT、标准设备 JIT 与 ABI v3 尚未接通。
 
-样例目录包含 24 个 kernel 和 132 个用例定义。`4f045a9d77` 的 Coral 教程选项在 S0～S7 验证 27 个特化，加入提议的 INT8 dot 下界后共 34 个。Coral 默认模式通过 4 组 lit，离线 CUDA 模式通过 5 组。正式 `CoralOptions` 的 `S1.add` 仍缺少 `sanitize_overflow`。同一提交的 `make_llir` 和 `make_elf` 留待单核闭环替换。
+| 已有实现 | 代码与分支 | 证据及对应小节 |
+| --- | --- | --- |
+| LLVM 24 版本锁、Python 发现、C++ binding、AOT 编译骨架 | `triton-coral@4f045a9d77`，LLVM 锁由 `d63968303d` 引入 | 在 compiler-1 复跑第三方骨架测试，确认 `coral.hello()` 及 `add_kernel` 缓存字节。[1.1](tutorials/ch01-skeleton/01-toolchain-discovery.md) |
+| RV32 v2 布局与正式前端选项 | 固件 `coralnpu@f9ab975c` 的 `device/task_abi.h`，compiler-1 的 `backend/compiler.py` 本地改动 | 针对真实头文件编译 offset/size 断言。正式选项生成 5 份 TTIR，两个合法目标、非法架构和 warp size 均按预期处理。[1.2](tutorials/ch01-skeleton/02-abi-contract.md) · [1.3](tutorials/ch01-skeleton/03-frontend-options.md) |
+| 控制核启动、四核 RVV、预编译算子及性能采样 | `coralnpu` 的 `feat/ncoral-model@180b1ca6` | 四核向量加法、GEMM 和卷积已有 RTL 数值记录。性能报告验证 `mcycle` 与 `minstret`。[2.7](tutorials/ch02-scalar-single-core/07-core0-execution.md) · [7.1](tutorials/ch07-multicore-rt/01-core-mask.md) · [10.1](tutorials/ch10-optimization-extension/01-profiling-baseline.md) |
+| AXI DMA、队列、事件、Zvt | `coralnpu` 的 `feat/ncoral-dma-events-zvt@c673e673` | 宿主队列 sanitizer 已复跑。9 个 RTL 流水线、23 个 RVV 回归及 INT8→INT32 矩阵由分支报告记录。[7.3](tutorials/ch07-multicore-rt/03-bounded-queue-isolation.md) · [9.3](tutorials/ch09-matrix-zvt/03-zvt-instruction-gen.md) |
+| HBF 与纯存储 3D DRAM | `coralnpu` 的 `dev/ncoral-hbf-3dpim@f9ab975c` | 隔离存储互联本次复跑 25 项通过。版本化报告覆盖 10 项整机与 9 项 SRAM 兼容回归。[8.1](tutorials/ch08-tiered-memory/01-region-resource-model.md) · [8.3](tutorials/ch08-tiered-memory/03-dma-ordering-visibility.md) |
+| Coral HAL、ELF 装载和分派统计 | `coralnpu-compiler@5c68026`，`runtime/driver/`、`runtime/sim/`、`runtime/metrics/` | 独立 IREE 路径已有实现，Triton JIT 调用边界见 [4.1](tutorials/ch04-jit-runtime/01-driver-dispatch.md)。 |
+
+设备侧报告中的算子来自其已编译 C/RVV/Zvt 镜像。Triton 的 2.1 隔离验证停在可重定位 RV32 对象。完整的 Triton 设备验收须追踪同一份源程序、实际 ELF、装载与回读证据。
+
+样例目录包含 24 个 kernel 和 132 个用例定义。`4f045a9d77` 的 Coral 教程选项在 S0～S7 验证 27 个特化，加入提议的 INT8 dot 下界后共 34 个。Coral 默认模式通过 4 组 lit，离线 CUDA 模式通过 5 组。这些覆盖数来自原始前端记录。当前正式选项的新增证据见 1.3 节。
 
 ## 实施参考
 

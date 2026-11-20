@@ -8,15 +8,17 @@
 
 ---
 
+已实现源码、运行命令和证据从 [实测基线](plan.md#实测基线) 开始查。第 1 章已在 compiler-1 验证，第 2.1 节仍需写入实际后端工作树。
+
 ## 全书目录导航
 
 ### [第 1 章：验证 Triton 后端发现与 C++ 插件骨架](tutorials/ch01-skeleton/)（阶段 S0）
 - [1.1 节：确认工具链、后端发现与 C++ 扩展](tutorials/ch01-skeleton/01-toolchain-discovery.md) `[已完成]`：确认 LLVM 锁定信息、后端发现与 C++ 扩展。
 - [1.2 节：约定 RV32 v2 参数与地址约定](tutorials/ch01-skeleton/02-abi-contract.md) `[已完成]`：写清 RV32 v2 参数和最小地址约定。
-- [1.3 节：补齐 CoralOptions 正式选项与 TTIR 生成](tutorials/ch01-skeleton/03-frontend-options.md) `[当前小课]`：让拷贝和加法通过正式 CoralOptions，并拒绝未知目标。
+- [1.3 节：补齐 CoralOptions 正式选项与 TTIR 生成](tutorials/ch01-skeleton/03-frontend-options.md) `[本地已验证]`：让拷贝和加法通过正式 CoralOptions，并拒绝未知目标。
 
 ### [第 2 章：标量语法降级与单核 AOT 执行闭环](tutorials/ch02-scalar-single-core/)（阶段 S1）
-- [2.1 节：空 Kernel LLVM 降级 Pass 与流水线接入](tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md) `[下一小课]`：在 make_llir 转换函数签名、指针和空返回，导出 RV32 LLVM IR。
+- [2.1 节：空 Kernel LLVM 降级 Pass 与流水线接入](tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md) `[当前小课]`：在 make_llir 转换函数签名、指针和空返回，导出 RV32 LLVM IR。
 - [2.2 节：标量访存：无掩码 i32 load/store 转换](tutorials/ch02-scalar-single-core/02-scalar-load-store.md) `[待实现]`：将无掩码 I32 的拷贝降为 LLVM 访存。
 - [2.3 节：标量算术：constexpr 常量与整数加法](tutorials/ch02-scalar-single-core/03-scalar-arithmetic.md) `[待实现]`：接入 constexpr 常量和 I32 加法，沿用第一批的 LLVM IR 导出。
 - [2.4 节：运行时入口包装与 ABI v2 绑定](tutorials/ch02-scalar-single-core/04-runtime-wrapper.md) `[待实现]`：让入口按 v2 解析参数、调用 kernel 并发布完成。

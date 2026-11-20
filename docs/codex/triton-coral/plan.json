@@ -2,7 +2,7 @@
   "date": "2026-11-19",
   "title": "Triton Coral 开发教程与实施计划",
   "decision": "后端骨架已搭建。用标准 Triton 程序定义语义，先打通单核 AOT，然后做 block/mask、标准 JIT、TTS/Linalg 结构化访存和控制流、归约与扫描、多核、分层存储、dot 和扩展语法。内部 IR、故障与资源契约用断言或 lit 验证。",
-  "baseline_note": "compiler-1 固定基线：triton-coral dev/triton-coral@4f045a9d77，coralnpu dev/ncoral-hbf-3dpim@f9ab975c。已验证骨架注册与源码到 TTIR，当前 LLIR/ELF 为占位。真实单核 AOT、标准设备 JIT 与 ABI v3 固件待验收。",
+  "baseline_note": "compiler-1（2026-11-20）：Triton Coral 骨架与 S0-03 的正式选项已在实际工作树验证。S0-03 尚未提交。主线的 make_llir/make_elf 仍是占位接口。空 kernel 教程已用隔离构建验证，真实单核 AOT、标准设备 JIT 与 ABI v3 尚未接通。",
   "phases": [
     [
       "S0",
@@ -106,7 +106,7 @@
       "可复现的版本和构建记录",
       "版本、补丁、目标配置及插件发现可复现，不误回退到 NVIDIA；浮点/BF16 配置不算对应 kernel 已通过；不要求 TTS 编译成功。",
       "中",
-      "待开始"
+      "已完成"
     ],
     [
       "S0-02",
@@ -118,7 +118,7 @@
       "一页最小 ABI 及地址说明",
       "编译器、入口和控制固件共享明确字节布局；明确 v2 槽位上限与版本扩展方式，不从宿主 void* 或结构体大小推断设备 ABI，版本或越界不匹配应拒绝。",
       "中",
-      "待开始"
+      "已完成"
     ],
     [
       "S0-03",
@@ -130,7 +130,7 @@
       "可重复的源程序与构建入口",
       "拷贝及加法使用正式选项生成合法 TTIR，空函数可单独生成。未知目标明确拒绝。check_plan.py 通过，前端和设备证据分别记录。",
       "中",
-      "待开始"
+      "已完成"
     ],
     [
       "S1-01",
@@ -1946,7 +1946,7 @@
       "指令/资源/故障/性能证据"
     ],
     "case_selection": "默认累计回归包括阶段必需用例和validated_capabilities中已验收模式；G5后已验收S9类型分支也纳入。--case仅跑指定项，不代表累计出口通过。",
-    "frontend_note": "默认选项只做源码检查。--backend-options 使用正式 CoralOptions，S1.add 当前缺少 sanitize_overflow。教程 dot 合同的 34 个特化只证明源码可达，真实目标回调待验收。",
+    "frontend_note": "默认选项只做源码检查。compiler-1 本地的正式 CoralOptions 已通过 --backend-options 的 5 个特化。教程 dot 合同的 34 个特化只证明源码可达，真实目标回调待验收。",
     "current_gap": "4f045a9d77 的 get_codegen_implementation 返回空字典，dot 缺少 min_dot_size。前端脚本补充的语言选项也须在正式 CoralOptions 中按能力落实。",
     "trust_boundary": "适配器须从真实编译工具和 RTL/设备采集产物及轨迹。校验器可拒绝缺失/错配/不合法证据，不能认证一个恶意适配器没有伪造文件。",
     "regression_pipeline": "current-mainline；旧 case 也走当前主线，不能按 case.stage 偷切旧实现。",

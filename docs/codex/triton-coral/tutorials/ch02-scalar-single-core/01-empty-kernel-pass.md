@@ -250,7 +250,7 @@ endif()
 
 ### A. 验证原生转换
 
-在 compiler-1 用已配置的 LLVM 24 构建目录。下面的 shell 变量也会用于下一段测试。若导入时先报 `third_party/amd/backend/driver.py` 的 `SyntaxError`，先检查对应函数定义末尾是否混入了全角字符，例如 `def __init__(self):、`。Triton 会在选择 Coral 目标之前导入各后端。
+在 compiler-1 用已配置的 LLVM 24 构建目录。下面的 shell 变量也会用于下一段测试。编译前可按 [1.1 节](../ch01-skeleton/01-toolchain-discovery.md) 确认当前 Python 能加载后端。
 
 ```bash
 set -e

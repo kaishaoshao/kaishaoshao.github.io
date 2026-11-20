@@ -51,7 +51,7 @@ triton-coral/
 │   ├── include/TritonCoralToLLVM/       # S1-01a 新建
 │   │   ├── CMakeLists.txt
 │   │   ├── Passes.td
-│   │   └── Passes.h
+│   │   └── TritonCoralToLLVM.h
 │   ├── lib/TritonCoralToLLVM/           # S1-01a 新建
 │   │   ├── CMakeLists.txt
 │   │   └── TritonCoralToLLVM.cpp

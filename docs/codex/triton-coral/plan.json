@@ -136,9 +136,9 @@
       "S1-01",
       "S1 AOT 闭环",
       "实现最小 TTIR 到 LLVM 转换",
-      "按 S1-01a 空函数/指针签名、S1-01b 标量 i32 load/store、S1-01c 常量/addi 推进。先从现有 Coral 扩展调用标准 FuncToLLVM，用 triton-opt 复核产物。空函数用 S1.empty.frontend/S1.empty.llvm 单独验收。源级动态分支留 S4。",
+      "先把 TritonCoralToLLVM 接入 make_llir，用 triton.compile 验证空 kernel 和 RV32 LLVM IR。再在同一 pass 加 i32 load/store、常量与 addi。源级动态分支留 S4。",
       "S0-03",
-      "third_party/coral/triton_coral.cc；后续接 backend/compiler.py",
+      "third_party/coral/lib/TritonCoralToLLVM.cpp；triton_coral.cc；backend/compiler.py",
       "由真实 TTIR 生成的 LLVM IR",
       "空函数 LLVM 方言 checkpoint/verifier 与标量 LLVM IR 均合法；G1 源白名单仅拷贝、常量加法和回绕。O0/O2 与无 UB 参考一致，不擅加 nsw/nuw；更多算术逐项加测试。",
       "高",
@@ -1262,9 +1262,9 @@
         "steps": [
           [
             "S1-01a",
-            "转换函数签名、标量指针和空返回。",
-            "源码 `S1.empty.frontend` 用 `EMPTY`。实际 pass 产物用 `EMPTYLLVM` 和 `S1.empty.llvm` 核对。",
-            "`verifier.mlir` 是 LLVM 方言契约样例。完成这一步需要查看转换 pass 的真实输出。"
+            "在 make_llir 转换函数签名、指针和空返回，导出 RV32 LLVM IR。",
+            "`S1.empty.frontend` 看 `EMPTY`。实际产物用 `EMPTYLLVM`、`EMPTYLLIR` 与 LLVM verifier。",
+            "用 `triton.compile` 验证正式流水线。`S1.copy` 应在 `tt.load` 报未合法化。"
           ],
           [
             "S1-01b",
@@ -1274,7 +1274,7 @@
           ],
           [
             "S1-01c",
-            "接入 constexpr 常量、I32 加法及 LLVM IR 导出。",
+            "接入 constexpr 常量和 I32 加法，沿用第一批的 LLVM IR 导出。",
             "`S1.add` 看 `SCALAR`。对降低后的 LLVM IR 用 `FINALLLVM` 和 `opt -passes=verify`。`S1.wrap` 随 G1 检查结果。",
             "保留 I32 回绕。对照拷贝和加法的 LLVM IR，确认计算来自源码，避免擅加 `nsw` 或 `nuw`。"
           ],
@@ -2155,7 +2155,7 @@
     [
       "S1-01a",
       "empty_kernel(X,Y): pass；指针在 ASTSource.signature 中声明",
-      "tt.func / !tt.ptr<i32> / tt.return → LLVM 方言",
+      "tt.func / !tt.ptr<i32> / tt.return → LLVM 方言 → RV32 LLVM IR",
       "标准 LLVM；编译检查模式 ir",
       "load/store/算术尚不进入这个微步"
     ],

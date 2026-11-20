@@ -4,9 +4,18 @@
 // EMPTY-NOT: tt.store
 // EMPTY: tt.return
 
-// EMPTYLLVM: llvm.func @empty_kernel
-// EMPTYLLVM-NOT: tt.func
+// EMPTYLLVM-LABEL: llvm.func @empty_kernel(
+// EMPTYLLVM-SAME: %{{[^:]+}}: !llvm.ptr{{[^%]*}}%{{[^:]+}}: !llvm.ptr
+// EMPTYLLVM-NOT: tt.
 // EMPTYLLVM: llvm.return
+
+// EMPTYLLIR: target datalayout = "{{[^"]*}}p:32:32{{[^"]*}}"
+// EMPTYLLIR: target triple = "riscv32-unknown-unknown-elf"
+// EMPTYLLIR-LABEL: define void @empty_kernel(
+// EMPTYLLIR-SAME: ptr %{{[^,]+}}, ptr %{{[^)]+}})
+// EMPTYLLIR: ret void
+
+// CORALUNSUPPORTED: error: failed to legalize operation 'tt.load'
 
 // SCALAR: tt.func public @scalar_add
 // SCALAR: tt.load

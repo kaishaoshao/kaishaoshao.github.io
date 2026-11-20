@@ -13,7 +13,7 @@
 ## 全书目录导航
 
 ### [第 1 章：验证 Triton 后端发现与 C++ 插件骨架](tutorials/ch01-skeleton/)（阶段 S0）
-- [1.1 节：确认工具链、后端发现与 C++ 扩展](tutorials/ch01-skeleton/01-toolchain-discovery.md) `[已完成]`：确认 LLVM 锁定信息、后端发现与 C++ 扩展。
+- [1.1 节：确认工具链、后端发现与 C++ 扩展](tutorials/ch01-skeleton/01-toolchain-discovery.md) `[已完成]`：按八步复现后端骨架，包含完整源码、CMake 与 Python 注册链、缓存实测和排错。
 - [1.2 节：约定 RV32 v2 参数与地址约定](tutorials/ch01-skeleton/02-abi-contract.md) `[已完成]`：写清 RV32 v2 参数和最小地址约定。
 - [1.3 节：补齐 CoralOptions 正式选项与 TTIR 生成](tutorials/ch01-skeleton/03-frontend-options.md) `[本地已验证]`：让拷贝和加法通过正式 CoralOptions，并拒绝未知目标。
 

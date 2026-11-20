@@ -9,7 +9,7 @@ Triton 源码 → TTIR → LLVM 方言 → LLVM IR → RV32 ELF
 
 ## 第一批：正式选项与空函数 lowering
 
-把 **S0-03 和 S1-01a** 一起做。目标是让正式 Coral 选项生成 TTIR，再把其中的空函数交给你新注册的转换 pass。最后检查生成的 LLVM 方言，并用含访存的合法 TTIR 验证转换确实拒绝越出当前范围的输入。
+把 **S0-03 和 S1-01a** 一起做。目标是让正式 Coral 选项生成 TTIR，再用现有 Coral 扩展调用 MLIR 的标准函数转换。最后检查生成的 LLVM 方言，并用含访存的合法 TTIR 验证转换确实拒绝越出当前范围的输入。
 
 ### 1. 补齐正式前端选项
 
@@ -33,180 +33,124 @@ Triton 的整数 `+` 会读取这个字段。固定骨架提交 `4f045a9d77` 的
     )
 ```
 
-### 2. 编写两个转换 pattern
+### 2. 需要修改的文件（仅 1 个现有 C++ 文件）
 
-新建 `third_party/coral/lib/Conversion/MinimalTritonToLLVM.cpp`。当前只接受单块、无结果的公开空函数。`TypeConverter` 把 Triton 全局 `*i32` 参数映射为这一步约定的 LLVM 默认地址空间指针，适用于首版平坦的 RV32 地址模型。LLVM 指针的位宽后续由目标 data layout 决定。
+修改 Triton checkout 中的 `third_party/coral/triton_coral.cc`。保留现有 `hello()`，增加一个 Python binding，在该入口调用 MLIR 自带的 `FuncToLLVM`。以下是修改后的完整文件。前面的 S0-03 仍按两处 Python 修改完成。
 
 ```cpp
-// MinimalTritonToLLVM.cpp
+// triton_coral.cc
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
+
+#include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Pass/PassManager.h"
 #include "triton/Dialect/Triton/IR/Dialect.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
-namespace {
-using namespace mlir;
-namespace tt = mlir::triton;
+namespace py = nanobind;
 
-struct EmptyFuncLowering : OpConversionPattern<tt::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
+void init_triton_coral(py::module_ &m) {
+  m.doc() = "Python bindings to the Coral Triton backend";
+  m.def("hello", []() { return "Hello from Coral backend!"; });
 
-  LogicalResult matchAndRewrite(tt::FuncOp op, OpAdaptor,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (!op.isPublic() || !llvm::hasSingleElement(op.getBody()) ||
-        !op.getResultTypes().empty())
-      return rewriter.notifyMatchFailure(op, "expected a public void function with one block");
+  m.def("lower_empty_kernel", [](mlir::ModuleOp source) -> std::string {
+    using namespace mlir;
+    namespace tt = mlir::triton;
 
-    Block &body = op.getBody().front();
-    if (!llvm::hasSingleElement(body) || !isa<tt::ReturnOp>(body.front()))
-      return rewriter.notifyMatchFailure(op, "expected a body containing only tt.return");
+    if (!llvm::hasSingleElement(*source.getBody()))
+      throw py::value_error("expected one top-level tt.func");
 
-    SmallVector<Type> params;
-    if (failed(getTypeConverter()->convertTypes(op.getArgumentTypes(), params)))
-      return rewriter.notifyMatchFailure(op, "expected global pointers to i32");
+    auto kernel = dyn_cast<tt::FuncOp>(source.getBody()->front());
+    if (!kernel || !kernel.isPublic() || !kernel.getResultTypes().empty() ||
+        !llvm::hasSingleElement(kernel.getBody()))
+      throw py::value_error("expected a public void tt.func with one block");
 
-    auto type = LLVM::LLVMFunctionType::get(
-        LLVM::LLVMVoidType::get(rewriter.getContext()), params);
-    auto lowered = LLVM::LLVMFuncOp::create(rewriter, op.getLoc(), op.getSymName(), type);
-    rewriter.inlineRegionBefore(op.getBody(), lowered.getBody(), lowered.getBody().end());
-    if (failed(rewriter.convertRegionTypes(&lowered.getBody(), *getTypeConverter())))
-      return rewriter.notifyMatchFailure(op, "could not convert entry arguments");
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
+    Block &body = kernel.getBody().front();
+    if (!llvm::hasSingleElement(body) || !isa<tt::ReturnOp>(body.front()) ||
+        body.front().getNumOperands() != 0)
+      throw py::value_error("expected a kernel body containing only tt.return");
 
-struct VoidReturnLowering : OpConversionPattern<tt::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+    MLIRContext *ctx = source.getContext();
+    ctx->loadDialect<func::FuncDialect, LLVM::LLVMDialect>();
+    SmallVector<Type> arguments;
+    for (Type type : kernel.getArgumentTypes()) {
+      auto ptr = dyn_cast<tt::PointerType>(type);
+      if (!ptr || ptr.getAddressSpace() != tt::PtrAddrSpace::Global ||
+          !ptr.getPointeeType().isInteger(32))
+        throw py::value_error("expected a global pointer to i32");
+      arguments.push_back(LLVM::LLVMPointerType::get(ctx));
+    }
 
-  LogicalResult matchAndRewrite(tt::ReturnOp op, OpAdaptor adaptor,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getOperands().empty())
-      return rewriter.notifyMatchFailure(op, "expected a void return");
-    rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, ValueRange{});
-    return success();
-  }
-};
+    OwningOpRef<ModuleOp> bridge(ModuleOp::create(source.getLoc()));
+    OpBuilder builder(ctx);
+    builder.setInsertionPointToStart(bridge->getBody());
+    auto function = func::FuncOp::create(
+        builder, kernel.getLoc(), kernel.getSymName(),
+        builder.getFunctionType(arguments, {}));
+    builder.setInsertionPointToStart(function.addEntryBlock());
+    func::ReturnOp::create(builder, body.front().getLoc());
 
-struct MinimalTritonToLLVM : PassWrapper<MinimalTritonToLLVM, OperationPass<ModuleOp>> {
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MinimalTritonToLLVM)
+    PassManager pm(ctx);
+    pm.addPass(createConvertFuncToLLVMPass());
+    if (failed(pm.run(*bridge)))
+      throw py::value_error("FuncToLLVM failed");
 
-  StringRef getArgument() const override { return "convert-coral-minimal-triton-to-llvm"; }
-  StringRef getDescription() const override { return "Lower empty Coral kernels to LLVM dialect"; }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect>();
-  }
-
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    TypeConverter converter;
-    converter.addConversion([context](tt::PointerType ptr) -> Type {
-      if (ptr.getAddressSpace() != tt::PtrAddrSpace::Global || !ptr.getPointeeType().isInteger(32))
-        return {};
-      return LLVM::LLVMPointerType::get(context);
-    });
-
-    RewritePatternSet patterns(context);
-    patterns.add<EmptyFuncLowering, VoidReturnLowering>(converter, context);
-
-    ConversionTarget target(*context);
-    target.addLegalOp<ModuleOp>();
-    target.addLegalDialect<LLVM::LLVMDialect>();
-    target.addIllegalDialect<tt::TritonDialect>();
-    if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
-      signalPassFailure();
-  }
-};
-} // namespace
-
-namespace mlir::triton::coral {
-void registerMinimalTritonToLLVMPass() {
-  PassRegistration<MinimalTritonToLLVM>{};
+    std::string text;
+    llvm::raw_string_ostream stream(text);
+    bridge->print(stream);
+    return text;
+  });
 }
-} // namespace mlir::triton::coral
 ```
 
-`tt.func` pattern 移动原有 region 并转换入口 block 参数，`tt.return` pattern 生成 `llvm.return`。函数定义和入口参数类型要同时转换。用真实 `S1.copy` 做负例，可以发现漏写 body 检查或把非法操作当成已转换的问题。
+**原理分析**
 
-### 3. 接入 CMake 和 triton-opt
+- 先读取真实的 Triton 模块，检查只有一个公开、无结果的空函数，然后根据它的函数名、参数和返回建立标准 `func.func`。使用类型化 MLIR API，函数名和参数数量都来自输入。
+- 这一课把 Triton 全局 `*i32` 参数映射到平坦地址模型的 `!llvm.ptr`。指针位宽后续由 RV32 data layout 决定。
+- 调用标准 `createConvertFuncToLLVMPass()` 完成 `func.func → llvm.func` 和 `func.return → llvm.return`。当前 SDK 已把这套转换链接进 `libtriton.so`。
+- 入口先检查整个空函数契约。真实 `S1.copy` 含 load/store，会在构造中间 IR 前明确报错。接通标量访存和算术后再扩大入口范围。
 
-在 `third_party/coral/CMakeLists.txt` 中，放在现有 Python 插件的 `if(...)` 块之前。
+### 3. 编译与验证命令
 
-```cmake
-add_triton_library(CoralMinimalTritonToLLVM
-  lib/Conversion/MinimalTritonToLLVM.cpp
-  DEPENDS TritonTableGen
-  LINK_LIBS PUBLIC TritonIR MLIRLLVMDialect MLIRPass MLIRTransforms
-)
-```
-
-`bin/CMakeLists.txt` 已通过全局 `TRITON_LIBS` 收集 `add_triton_library` 的库。在 `add_executable(triton-opt triton-opt.cpp)` 后，给包含 Coral 的构建开启注册。
-
-```cmake
-if(TARGET CoralMinimalTritonToLLVM)
-  target_compile_definitions(triton-opt PRIVATE TRITON_ENABLE_CORAL_LOWERING)
-endif()
-```
-
-在 `bin/triton-opt.cpp` 中的 `main` 前加声明，并在 `main` 内 `registerTritonDialects(registry);` 之后调用。声明和调用使用同一个宏。
-
-```cpp
-// File scope, before main.
-#ifdef TRITON_ENABLE_CORAL_LOWERING
-namespace mlir::triton::coral {
-void registerMinimalTritonToLLVMPass();
-}
-#endif
-```
-
-```cpp
-  // Inside main, after registerTritonDialects(registry).
-#ifdef TRITON_ENABLE_CORAL_LOWERING
-  mlir::triton::coral::registerMinimalTritonToLLVMPass();
-#endif
-```
-
-### 4. 用源码验证正例和负例
-
-在 WSL 的 Triton checkout 根目录执行。下面给出本机样例目录的默认值，也可以沿用[第一次运行](plan.md#第一次运行)中设置的 `CORAL_TUTORIAL`。本机的构建目录是 `build/coral-llvm24`。
+在 WSL 增量编译并同步 Python 加载的扩展。本机的构建目录是 `build/coral-llvm24`。
 
 ```bash
 cd ~/work/coral/triton-coral
 export TRITON_BACKENDS_IN_TREE=1 TRITON_DEFAULT_BACKEND=coral
-CORAL_TUTORIAL="${CORAL_TUTORIAL:-/mnt/c/Users/20327/Documents/ChatGPT/learn/kaishaoshao.github.io/docs/codex/triton-coral/examples}"
 sdk="$HOME/work/coral/coralnpu-compiler/out/llvm-zvt/install"
-bin="$PWD/build/coral-llvm24/bin"
+build="$PWD/build/coral-llvm24"
+export PATH="$sdk/bin:$PATH"
+
+make BUILD_DIR="$build" PYTHON="$PWD/.venv/bin/python"
+install -m 755 "$build/python-module/libtriton.so" python/triton/_C/libtriton.so.new
+mv -T python/triton/_C/libtriton.so.new python/triton/_C/libtriton.so
+```
+
+下面的验证在临时输出目录写 TTIR。先完成前面的 S0-03，再用正式选项生成用例。Python 脚本可以直接执行。
+
+```bash
+set -e
+examples="${CORAL_TUTORIAL:-/mnt/c/Users/20327/Documents/ChatGPT/learn/kaishaoshao.github.io/docs/codex/triton-coral/examples}"
 out=$(mktemp -d /tmp/coral-first-lowering-XXXXXX)
 
-PATH="$sdk/bin:$PATH" make triton-opt BUILD_DIR="$PWD/build/coral-llvm24" \
-  PYTHON="$PWD/.venv/bin/python"
-
-.venv/bin/python "$CORAL_TUTORIAL/dump_ttir.py" --stage S1 --cumulative \
+.venv/bin/python "$examples/dump_ttir.py" --stage S1 --cumulative \
   --case S0.frontend --case S1.add --case S1.empty.frontend --case S1.copy \
   --backend-options --output "$out"
 
-"$bin/triton-opt" --convert-coral-minimal-triton-to-llvm \
-  "$out/S1.empty.frontend.0.ttir" -o "$out/empty.llvm.mlir"
-"$sdk/bin/FileCheck" "$CORAL_TUTORIAL/ir_checks.txt" --check-prefix=EMPTYLLVM \
-  --input-file="$out/empty.llvm.mlir"
+.venv/bin/python - "$out" <<'PY'
+import sys
+from pathlib import Path
 
-if "$bin/triton-opt" --convert-coral-minimal-triton-to-llvm \
-    "$out/S1.copy.0.ttir" -o "$out/copy.llvm.mlir" 2>"$out/copy.err"; then
-  echo "FAIL: the empty-function pass accepted load/store" >&2
-  false
-fi
-grep -F "failed to legalize operation" "$out/copy.err"
-```
-
-目标负例走真实的 backend 选择入口。
-
-```bash
-.venv/bin/python - <<'PY'
+from triton._C.libtriton import coral, ir
 from triton.backends.compiler import GPUTarget
 from triton.compiler.compiler import make_backend
+
+out = Path(sys.argv[1])
 
 for arch in ("coral-rv32", "rv32imf_zve32x"):
     assert make_backend(GPUTarget("coral", arch, 1)).target.arch == arch
@@ -214,14 +158,41 @@ for arch in ("coral-rv32", "rv32imf_zve32x"):
 try:
     make_backend(GPUTarget("coral", "coral-invalid", 1))
 except RuntimeError as error:
-    assert str(error).startswith("0 compatible backends")
+    assert str(error).startswith("0 compatible backends"), error
     print("PASS: rejected coral-invalid")
 else:
-    raise AssertionError("coral-invalid was accepted")
+    raise AssertionError("unsupported Coral arch was accepted")
+
+def lower(filename):
+    context = ir.context()
+    ir.load_dialects(context)
+    module = ir.parse_mlir_module(str(out / filename), context)
+    assert module.verify()
+    return coral.lower_empty_kernel(module)
+
+(out / "empty.llvm.mlir").write_text(lower("S1.empty.frontend.0.ttir"))
+try:
+    lower("S1.copy.0.ttir")
+except ValueError as error:
+    assert "expected a kernel body containing only tt.return" in str(error), error
+    print("PASS: load/store rejected by the empty-kernel entry")
+else:
+    raise AssertionError("load/store kernel was accepted")
 PY
+
+"$build/bin/triton-opt" "$out/empty.llvm.mlir" -o /dev/null
+"$sdk/bin/FileCheck" "$examples/ir_checks.txt" --check-prefix=EMPTYLLVM \
+  --input-file="$out/empty.llvm.mlir"
+cat "$out/empty.llvm.mlir"
 ```
 
-**交付证据**是正式选项生成的 5 份 TTIR、通过 `EMPTYLLVM` 的 `empty.llvm.mlir`、拷贝被拒绝的诊断，以及 `PASS: rejected coral-invalid`。到这里即可交这一批。`S1.empty.llvm` 的适配器模式留到适配器接通后复跑。
+**预期结果**
+
+1. 正式前端生成 5 份 TTIR，非法架构被拒绝。
+2. `empty.llvm.mlir` 有 `llvm.func @empty_kernel`、两个 `!llvm.ptr` 参数及 `llvm.return`，通过 verifier 和 `EMPTYLLVM`。
+3. `S1.copy` 产生合法 TTIR，进入空函数转换时失败。验证脚本打印 `PASS: load/store rejected by the empty-kernel entry`。
+
+交付这一批时发出空函数输出和负例诊断。接通适配器后，再用已有 `S1.empty.llvm` 用例保存真实检查点。
 
 ## 第二批：标量访存、整数加法与 LLVM IR 导出
 

@@ -12,7 +12,7 @@
   → 下载结果，与 CPU 参考值比较
 ```
 
-SimX 不解析 HIP 源码。结构正确的 ELF / `.vxbin` 还需要匹配指令集、启动流程、线程语义及参数 ABI，才能正确运行。
+SimX 不解析 HIP 源码。ELF 和 `.vxbin` 仍需匹配指令集、启动流程、线程语义及参数 ABI。独立 SimX 命令行可以按 ELF 装载段与入口启动。L03.0 的 `_start` 自己准备 `a0` 中的输出指针，并在设备端比较结果。[直接 ELF 实验](chapters/03-store42/00-direct-elf.md)
 
 ## 编译与链接
 
@@ -41,7 +41,7 @@ vortex/sw/runtime/include/vortex2.h
 
 ## L03 操作图：单个 out 指针怎样到达 store42
 
-这是供你实现的教学桥接，**尚未作为新后端设备镜像执行通过**。先在 L02 得到实际函数 IR，再逐步填齐下面的产物，不假定现有 demo host 能启动任意函数。
+下面说明 SDK 路径的参数接口。用户实验用手写 C++ wrapper 和参考启动对象接通了读回 42 的流程。随后的 IR 片段用于练习同一调用关系。[L03 SDK 运行记录](chapters/03-store42/04-sdk-launch.md)
 
 ```text
 host 分配输出 buffer → 查询设备地址 out_addr

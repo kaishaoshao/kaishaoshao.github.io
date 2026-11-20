@@ -9,6 +9,10 @@ from urllib.parse import unquote
 
 
 ROOT = Path(__file__).resolve().parent.parent
+CHAPTERS = ROOT / "chapters"
+FENCED_CODE = re.compile(
+    r"^([ ]{0,3})```([^\n]*)\n(.*?)^\1```[ \t]*$", re.M | re.S
+)
 
 
 def require(condition, message):
@@ -17,11 +21,11 @@ def require(condition, message):
 
 
 def code_blocks(text):
-    return re.findall(r"^```([^\n]*)\n(.*?)^```\s*$", text, re.M | re.S)
+    return [(language, body) for _, language, body in FENCED_CODE.findall(text)]
 
 
 def anchors(path):
-    text = re.sub(r"^```[^\n]*\n.*?^```\s*$", "", path.read_text(), flags=re.M | re.S)
+    text = FENCED_CODE.sub("", path.read_text(encoding="utf-8"))
     result = set(re.findall(r'<a\s+(?:id|name)="([^"]+)"', text))
     counts = {}
     for heading in re.findall(r"^#{1,6}\s+(.+?)\s*#*$", text, re.M):
@@ -35,13 +39,50 @@ def anchors(path):
     return result
 
 
+def check_book():
+    cover = (ROOT / "tutorial.md").read_text(encoding="utf-8")
+    contents = cover.split("## 全书目录", 1)[1].split("## 序章", 1)[0]
+    chapter_dirs = sorted(path for path in CHAPTERS.iterdir() if path.is_dir())
+    chapter_sizes = (3, 5, 6, 4, 6, 5)
+    require(len(chapter_dirs) == len(chapter_sizes), "expected six chapter directories")
+    expected_contents = []
+    lessons = []
+    for chapter_no, (directory, size) in enumerate(zip(chapter_dirs, chapter_sizes), 1):
+        index = directory / "README.md"
+        pages = sorted(path for path in directory.glob("*.md") if path != index)
+        require(len(pages) == size, f"unexpected lesson count: {directory.name}")
+        index_text = index.read_text(encoding="utf-8")
+        chapter_links = re.findall(r"^- \[L\d{2}\.\d+ [^\]]+\]\(([^)]+)\)$", index_text, re.M)
+        require(chapter_links == [path.name for path in pages], f"chapter links out of order: {index}")
+        expected_contents.extend(path.relative_to(ROOT).as_posix() for path in [index, *pages])
+        first_step = 0 if chapter_no == 3 else 1
+        for step, path in enumerate(pages, first_step):
+            lesson_id = f"L{chapter_no:02}.{step}"
+            heading = path.read_text(encoding="utf-8").splitlines()[0]
+            require(heading.startswith(f"# {lesson_id} "), f"lesson heading mismatch: {path}")
+            lessons.append((lesson_id, path))
+
+    cover_links = re.findall(r"\]\((chapters/[^)]+\.md)\)", contents)
+    require(cover_links == expected_contents, "book table of contents out of order")
+    for position, (lesson_id, path) in enumerate(lessons):
+        footer = path.read_text(encoding="utf-8").strip().splitlines()[-1]
+        links = re.findall(r"\]\(([^)]+)\)", footer)
+        expected_prev = lessons[position - 1][1] if position else ROOT / "tutorial.md"
+        expected_next = lessons[position + 1][1] if position + 1 < len(lessons) else ROOT / "tutorial.md"
+        destinations = [(path.parent / link.split("#", 1)[0]).resolve() for link in links]
+        require(destinations == [expected_prev, path.parent / "README.md", expected_next],
+                f"incorrect reading navigation: {lesson_id}")
+    return chapter_dirs, lessons
+
+
 def main():
-    documents = [*sorted(ROOT.glob("*.md")), ROOT.parent / "README.md"]
+    documents = [*sorted(ROOT.glob("*.md")), *sorted(CHAPTERS.rglob("*.md")), ROOT.parent / "README.md"]
     link_count = 0
     for path in documents:
-        text = path.read_text()
-        require(len(re.findall(r"^```", text, re.M)) % 2 == 0, f"unbalanced fences: {path}")
-        for target in re.findall(r"\]\(([^)]+)\)", text):
+        text = path.read_text(encoding="utf-8")
+        require(not re.search(r"^[ ]{0,3}```", FENCED_CODE.sub("", text), re.M),
+                f"unbalanced fences: {path}")
+        for target in re.findall(r"\]\(([^)]+)\)", FENCED_CODE.sub("", text)):
             if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", target):
                 continue
             name, _, anchor = unquote(target).partition("#")
@@ -51,17 +92,18 @@ def main():
                 require(anchor in anchors(destination), f"missing anchor: {path.name}: {target}")
             link_count += 1
 
-    tasks = (ROOT / "tasks.md").read_text()
+    tasks = (ROOT / "tasks.md").read_text(encoding="utf-8")
     task_ids = re.findall(r"^### (T\d{2}\.\d+)\s", tasks, re.M)
     expected = [f"T{group:02}.{item}" for group in range(11) for item in range(1, 7)]
     require(task_ids == expected, "task IDs must preserve the ordered 66-entry ledger")
     for path in documents:
-        references = set(re.findall(r"\bT\d{2}\.\d+", path.read_text()))
+        references = set(re.findall(r"\bT\d{2}\.\d+", path.read_text(encoding="utf-8")))
         require(references <= set(expected), f"unknown task reference: {path.name}")
 
-    plan = (ROOT / "plan.md").read_text()
-    lessons = re.findall(r"^### (L\d{2})：", plan, re.M)
-    require(lessons == [f"L{i:02}" for i in range(1, 7)], "expected six ordered lessons")
+    chapters, lessons = check_book()
+    plan = (ROOT / "plan.md").read_text(encoding="utf-8")
+    chapter_ids = re.findall(r"^### (L\d{2})：", plan, re.M)
+    require(chapter_ids == [f"L{i:02}" for i in range(1, 7)], "expected six ordered chapters in plan")
     dependency_text = tasks.split('<a id="task-dependencies"></a>', 1)[1].split("## 源码导航", 1)[0]
     dependencies = {}
     for group, needs in re.findall(r"^\| (T\d{2}) \| ([^|]+) \|", dependency_text, re.M):
@@ -81,22 +123,24 @@ def main():
     for group in dependencies:
         visit(group, set())
 
-    getting_started = (ROOT / "getting-started.md").read_text()
-    displayed = [body for language, body in code_blocks(getting_started) if language == "cpp"]
-    fixture = (ROOT / "examples/l01/attributes.hip").read_text().strip()
+    l01 = chapters[0]
+    l01_text = "\n".join(path.read_text(encoding="utf-8") for path in sorted(l01.glob("*.md")))
+    displayed = [body for language, body in code_blocks(l01_text) if language == "cpp"]
+    fixture = (ROOT / "examples/l01/attributes.hip").read_text(encoding="utf-8").strip()
     require(displayed and displayed[0].strip() == fixture, "attributes.hip and displayed source differ")
-    for language, command in code_blocks(getting_started):
+    for language, command in code_blocks(l01_text):
         if language == "bash" and "-target-abi lp64d" in command:
             require("-target-feature +d" in command, "lp64d observation must enable D")
-    require("-march=rv64imafd" not in getting_started, "standard baseline must not silently enable A")
+    require("-march=rv64imafd" not in l01_text, "standard baseline must not silently enable A")
 
     fixtures = {path.name for path in (ROOT / "examples/l01").glob("*.hip")}
     require(fixtures == {"attributes.hip", "illegal-host-call.hip", "illegal-device-call.hip",
                          "launch-ast.hip"}, "unexpected L01 fixture set")
     for path in (ROOT / "examples").glob("*.py"):
-        ast.parse(path.read_text(), filename=str(path))
+        ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     print(f"PASS: {len(documents)} documents, {link_count} local links/anchors")
-    print("PASS: 66 engineering IDs, six lessons, acyclic capability dependencies")
+    print(f"PASS: {len(chapters)} chapters, {len(lessons)} lessons, ordered reading navigation")
+    print("PASS: 66 engineering IDs and acyclic capability dependencies")
     print("PASS: tutorial source/fixtures, D/ABI observation options, Python syntax")
     print("Scope: static document/input checks; no compiler build or GPU execution.")
 

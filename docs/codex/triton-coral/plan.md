@@ -4,7 +4,7 @@
 
 **后端骨架已搭建。接下来让 `scalar_copy` 从 Triton 源码生成真实 RV32 ELF，在 core0 上写回 −37。** 先复跑 S0 的前端检查，再进入单核闭环。当前 `make_llir` 返回 TTIR 文本，`make_elf` 返回占位 `bytes`，这是骨架的验证边界。
 
-已搭好环境可直接跳到[第一次运行](#第一次运行)。需要复核插件发现、构建和 C++ 注册时读[第一课：验证骨架](tutorials/01-backend-skeleton.md)。开始实现代码生成时读[第二课：标量单核闭环](backend-skeleton.md)。完整的阶段、任务和依赖另存于 [plan.json](plan.json) 与 [tasks.xlsx](tasks.xlsx)。
+已搭好环境可直接跳到[第一次运行](#第一次运行)。全书路线图与章节目录请参考[教程全景总览](tutorial.md)。需要复核插件发现、构建和 C++ 注册时读[第 1 章：验证骨架](tutorials/ch01-skeleton/01-toolchain-discovery.md)。开始实现代码生成时读[第 2 章：标量单核闭环](tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md)。完整的阶段、任务和依赖另存于 [plan.json](plan.json) 与 [tasks.xlsx](tasks.xlsx)。
 
 ## 第一次运行
 
@@ -103,7 +103,7 @@ triton-coral/
 
 ## 逐阶段教程
 
-第一批逐步推进。**S0-03** 只补正式前端选项；**S1-01a** 先按组件目录构建并测试原生 pass，再接已有 `make_llir()`，通过 `triton.compile()` 验证 RV32 LLVM IR 和 `tt.load` 负例。 [修改文件、代码与测试](backend-skeleton.md#第一批正式选项与空-kernel-接入编译流水线)
+第一批逐步推进。**S0-03** 只补正式前端选项；**S1-01a** 先按组件目录构建并测试原生 pass，再接已有 `make_llir()`，通过 `triton.compile()` 验证 RV32 LLVM IR 和 `tt.load` 负例。下一批在同一 pass 增加标量访存与整数加法。 [空 kernel Pass 实现](tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md)
 
 每课先跑一个代表用例，再实现该阶段需要的转换。能从源码生成的合法 IR 用 lit/FileCheck 核对。非法 IR、ABI 及运行时状态用 verifier 或断言。单核先打通 AOT，S3 加入标准 `kernel[grid](...)`，以后保留 AOT/JIT 两条回归。
 
@@ -132,7 +132,7 @@ triton-coral/
 
 ### S1 标量语法与 AOT 执行
 
-**本阶段目标**  先降低空函数，再降低标量访存和加法。G1 把同一份源码生成的 RV32 ELF 加载到 core0，实际写回 −37。 [单核课](backend-skeleton.md)
+**本阶段目标**  先降低空函数，再降低标量访存和加法。G1 把同一份源码生成的 RV32 ELF 加载到 core0，实际写回 −37。 [第 2 章单核实战](tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md)
 
 对照 `empty_kernel`、`scalar_copy`、`scalar_add`。逐步观察 LLVM 函数签名、标量访存、`arith.addi` 降低。 [Kernel](examples/kernels/s1_scalar.py) · [用例和参考](examples/stage_cases/s1_scalar.py)
 
@@ -642,7 +642,7 @@ S9 的 `atomic_add` 正例只测一个 program 的旧值和更新值。扩展 GP
 
 ### 分阶段支持的 Triton 语法与方言白名单
 
-本表与 `plan.json` 同步。S1 从标量拷贝和常量加法开始，[标量课](backend-skeleton.md)给出实现顺序。S4 扩展布局和控制流，S5 加入整数归约和扫描。
+本表与 `plan.json` 同步。S1 从标量拷贝和常量加法开始，[第 2 章标量单核实战](tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md)给出实现顺序。S4 扩展布局和控制流，S5 加入整数归约和扫描。
 
 | 阶段 | 支持的Triton语法/语义 | 对应IR/执行 | 方言与接口策略 | 明确边界 |
 | --- | --- | --- | --- | --- |

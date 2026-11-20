@@ -133,7 +133,7 @@ def validate_plan(folder=HERE.parent, *, workbook=False):
         abi = data["abi_contract"][str(version)]
         if (abi["bindings"], abi["scalars"]) != CAPACITY[version] or abi["size"] != FRAME_SIZE[version]:
             raise ValueError("ABI codec/document capacity differs")
-    for name in ("plan.md", "backend-skeleton.md", "tutorials/01-backend-skeleton.md"):
+    for name in ("plan.md", "tutorial.md"):
         check_links(folder / name)
     if workbook:
         ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}

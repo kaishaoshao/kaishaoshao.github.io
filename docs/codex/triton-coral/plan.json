@@ -891,8 +891,7 @@
       "plan.md",
       "plan.json",
       "tasks.xlsx",
-      "backend-skeleton.md",
-      "tutorials/01-backend-skeleton.md"
+      "tutorial.md"
     ],
     "task_data_source": "plan.json",
     "update_policy": "同一主题原地更新；保留任务 ID、进度和证据，使用 Git 历史追踪变更。"

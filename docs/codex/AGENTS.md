@@ -11,7 +11,7 @@
 ## Triton Coral 的固定文件
 
 - `triton-coral/plan.md`：第一次运行、逐阶段练习及实施参考。每课给出源码、命令、观察点和验收信号。
-- `triton-coral/tutorials/01-backend-skeleton.md`：已实现骨架的冒烟与调用链。`triton-coral/backend-skeleton.md`：正式选项、标量降低和首个单核 ELF 闭环。
+- `triton-coral/tutorial.md`：后端开发实战教程总览与大纲。`triton-coral/tutorials/ch01-skeleton/`：已实现骨架的冒烟与调用链。`triton-coral/tutorials/ch02-scalar-single-core/`：正式选项、标量降低和首个单核 ELF 闭环。
 - `triton-coral/plan.json`：结构化计划数据，维护阶段、任务 ID、依赖、交付物、验收与状态。
 - `triton-coral/tasks.xlsx`：可筛选、可跟踪的任务表，以及方言、阶段验收和存储契约。
 - `triton-coral/examples/`：固定的语法样例、输入及独立参考、前端检查、阶段执行协议和测试框架自检。教程正文持续更新在 `plan.md`，不另建版本副本。

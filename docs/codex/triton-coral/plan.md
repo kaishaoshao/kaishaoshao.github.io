@@ -34,6 +34,58 @@ cat "$CORAL_TEST_OUT/s0/S0.frontend.0.ttir"
 | `PASS … [frontend]` 或 `[ir]` | 已验证适配器返回的指定编译检查点。 |
 | `PASS … [aot]` 或 `[jit]` | 正例有真实 RTL/设备证据且结果正确。诊断用例的 PASS 表示预期错误被观察到。 |
 
+## 源码目录与职责
+
+目前 Coral 已由 Triton 发现并加载。保留 `third_party/coral/backend/`、`triton_coral.cc` 和已有冒烟测试。S1-01a 第一次引入成对的转换组件目录。目录名使用模块名 `TritonCoralToLLVM`，与 NVIDIA 和 AMD 后端的转换组件组织一致。[Triton NVIDIA 后端构建](https://github.com/triton-lang/triton/blob/main/third_party/nvidia/CMakeLists.txt) · [MLIR 的 pass 声明](https://mlir.llvm.org/docs/PassManagement/#declarative-pass-specification)
+
+```text
+triton-coral/
+├── third_party/coral/
+│   ├── CMakeLists.txt
+│   ├── triton_coral.cc
+│   ├── backend/
+│   │   ├── __init__.py
+│   │   ├── name.conf
+│   │   ├── compiler.py
+│   │   └── driver.py
+│   ├── include/TritonCoralToLLVM/       # S1-01a 新建
+│   │   ├── CMakeLists.txt
+│   │   ├── Passes.td
+│   │   └── Passes.h
+│   ├── lib/TritonCoralToLLVM/           # S1-01a 新建
+│   │   ├── CMakeLists.txt
+│   │   └── TritonCoralToLLVM.cpp
+│   └── unittest/test1.py               # 已有骨架冒烟
+├── python/test/backend/                # 正式编译入口的回归
+└── test/                               # opt 可独立调用的 pass 回归
+```
+
+| 位置 | 职责 |
+| --- | --- |
+| `backend/compiler.py` | 验证目标与选项，组织 TTIR、LLVM IR、ELF 阶段，记录编译元数据。 |
+| `backend/driver.py` | 发现设备，选择目标。S3 再接装载与启动。 |
+| `triton_coral.cc` | 通过 nanobind 暴露 pass 添加函数。 |
+| `include/TritonCoralToLLVM/` | 声明 pass、名称和依赖方言。CMake 将 `Passes.h.inc` 生成到 build 目录。 |
+| `lib/TritonCoralToLLVM/` | 编写类型转换、conversion pattern 和合法性检查。CMake 以独立的 Triton 转换库构建。 |
+| Coral 根目录 `CMakeLists.txt` | 串起声明生成、转换库与 Python 插件。 |
+
+调用关系是 `compiler.py → triton_coral.cc → TritonCoralToLLVM → LLVM 方言`。回到 `make_llir()` 后，`llvm.to_module()` 导出 LLVM IR。这样修改一条 load/store 规则时，改动落在转换组件，Python 编译阶段沿用同一入口。
+
+### 什么时候增加文件
+
+| 时机 | 代码位置与职责 |
+| --- | --- |
+| S0-03 | 只改 `backend/compiler.py` 的选项和目标匹配。用已有构建跑 Python 前端，不触发 C++ 构建。 |
+| S1-01a | 先构建并验证上述转换组件，再接 `make_llir()`。pass 使用正式绑定，测试从真实 TTIR 或标准 Triton 源程序开始。 |
+| S1-01b/c | 在同一组件加无掩码访存、常量和加法。访存分支增长后可以在同目录拆出 `MemoryOpToLLVM.cpp`。 |
+| S1-02/03 | `third_party/coral/backend/runtime/` 存放随 kernel 链接的 `start.S` 与 `link.ld`，由 `make_elf()` 使用。交付 wheel 时把这两份资源加入 Coral 包数据并检查安装后能读取。 |
+| S2/S4 | S2 用现有 SCF 等方言表达 block 语义。S4 由二维访存和循环用例驱动 TTS 接入，再降低至 Linalg 并执行 bufferization。等第一条转换有可验证的输入与输出后，按转换名建对应的 `include/` 与 `lib/` 组件。 |
+| S6–S8 | 编译期布局、搬运与 tile 约束放在相应转换库。出现新语义后，再按各自的用例增加 `include/Dialect/` 与 `lib/Dialect/` 下的方言组件。S7 先验证存储层级及搬运语义，S8 再定义 tile 操作。实际队列、DMA、取指可见性、HBF/3D DRAM 配置由设备实现提供。 |
+
+`coralnpu-compiler` 提供固定 LLVM/MLIR SDK、RISC-V 目标代码生成和 Zvt 接口。`coralnpu` 提供 RTL、设备模型、控制固件和装载执行测试。Triton 侧通过版本化 ABI 和目标能力使用这些接口。逻辑 program ID 由编译语义确定，运行时根据核掩码和队列把程序分配给物理核。
+
+教程的 `examples/kernels/` 保存 Triton 源程序，`examples/stage_cases/` 保存输入、参考值和负例。实现进入 Triton 仓库时，编译回归放在 `python/test/backend/test_coral_compile.py`，空 kernel 和未支持的访存分别用一个测试函数。需要通过 `triton-opt` 直接运行 pass 时，接 CLI 注册后再写 `test/TritonCoralToLLVM/` 的 lit 回归。真实执行用例交给 Coral 模型与固件测试，核对同一编译产物的装载和回读。
+
 ## 大阶段目标
 
 | 阶段 | 先实现什么 | 任务 | 验收出口 | 通过标准 |
@@ -51,7 +103,7 @@ cat "$CORAL_TEST_OUT/s0/S0.frontend.0.ttir"
 
 ## 逐阶段教程
 
-完成 **S0-03** 的正式选项后，**S1-01a** 把 Coral conversion pass 接入已有 `make_llir()`。用 `triton.compile()` 验证空 kernel 的 RV32 LLVM IR 和 `tt.load` 负例。下一批在同一 pass 增加标量访存与整数加法。 [修改文件、代码与测试](backend-skeleton.md#第一批正式选项与空-kernel-接入编译流水线)
+第一批逐步推进。**S0-03** 只补正式前端选项；**S1-01a** 先按组件目录构建并测试原生 pass，再接已有 `make_llir()`，通过 `triton.compile()` 验证 RV32 LLVM IR 和 `tt.load` 负例。 [修改文件、代码与测试](backend-skeleton.md#第一批正式选项与空-kernel-接入编译流水线)
 
 每课先跑一个代表用例，再实现该阶段需要的转换。能从源码生成的合法 IR 用 lit/FileCheck 核对。非法 IR、ABI 及运行时状态用 verifier 或断言。单核先打通 AOT，S3 加入标准 `kernel[grid](...)`，以后保留 AOT/JIT 两条回归。
 
@@ -93,7 +145,7 @@ cat "$CORAL_TEST_OUT/s0/S0.frontend.0.ttir"
 
 | 小阶段 | 要完成的目标 | 测试与通过证据 | 实现注意 |
 | --- | --- | --- | --- |
-| S1-01a | 在 make_llir 转换函数签名、指针和空返回，导出 RV32 LLVM IR。 | `S1.empty.frontend` 看 `EMPTY`。实际产物用 `EMPTYLLVM`、`EMPTYLLIR` 与 LLVM verifier。 | 用 `triton.compile` 验证正式流水线。`S1.copy` 应在 `tt.load` 报未合法化。 |
+| S1-01a | 先验证原生 pass，再在 make_llir 导出 RV32 LLVM IR。 | 真实 TTIR 先用 `EMPTYLLVM` 验收。接入后用 `EMPTYLLIR` 与 LLVM verifier。 | 用 `triton.compile` 验证正式流水线。`S1.copy` 应在 `tt.load` 报未合法化。 |
 | S1-01b | 将无掩码 I32 的拷贝降为 LLVM 访存。 | 从 `S1.copy` 生成 TTIR。对实际 pass 的输出检查一个输入 load、一个输出 store 及 verifier。 | 仅在 ABI 保证对齐时标注对齐。用非法张量或 mask 负例检查未支持的转换。 |
 | S1-01c | 接入 constexpr 常量和 I32 加法，沿用第一批的 LLVM IR 导出。 | `S1.add` 看 `SCALAR`。对降低后的 LLVM IR 用 `FINALLLVM` 和 `opt -passes=verify`。`S1.wrap` 随 G1 检查结果。 | 保留 I32 回绕。对照拷贝和加法的 LLVM IR，确认计算来自源码，避免擅加 `nsw` 或 `nuw`。 |
 | S1-02 | 让入口按 v2 解析参数、调用 kernel 并发布完成。 | 主机检查参数帧。接通启动器后运行 `S1.bad-abi`，非法版本请求应无 launch。 | 对齐栈并保护参数区域。写回对消费者可见后再记录完成。 |
@@ -639,7 +691,7 @@ grid=1、共享 SRAM；标准 LLVM 方言，不引入 TTS/RVV/DMA。
 
 | ID | 任务 | 实现内容 | 技术前置 | 交付物 | 通过标准 |
 | --- | --- | --- | --- | --- | --- |
-| S1-01 | 实现最小 TTIR 到 LLVM 转换 | 先把 TritonCoralToLLVM 接入 make_llir，用 triton.compile 验证空 kernel 和 RV32 LLVM IR。再在同一 pass 加 i32 load/store、常量与 addi。源级动态分支留 S4。 | S0-03 | 由真实 TTIR 生成的 LLVM IR | 空函数 LLVM 方言 checkpoint/verifier 与标量 LLVM IR 均合法；G1 源白名单仅拷贝、常量加法和回绕。O0/O2 与无 UB 参考一致，不擅加 nsw/nuw；更多算术逐项加测试。 |
+| S1-01 | 实现最小 TTIR 到 LLVM 转换 | 先构建 TritonCoralToLLVM 组件并验证 LLVM 方言，再接 make_llir 生成 RV32 LLVM IR。之后在同一组件加 i32 load/store、常量与 addi。源级动态分支留 S4。 | S0-03 | 由真实 TTIR 生成的 LLVM IR | 空函数 LLVM 方言 checkpoint/verifier 与标量 LLVM IR 均合法；G1 源白名单仅拷贝、常量加法和回绕。O0/O2 与无 UB 参考一致，不擅加 nsw/nuw；更多算术逐项加测试。 |
 | S1-02 | 实现 kernel 入口包装 | 入口按 v2 参数框架（a0=0x00010000）校验 abi/size、设置 16B 对齐栈（sp=0x00018000）、读取设备参数、调用生成函数，并在返回前执行 fence rw,rw 后向 args->done 指向地址写 1。控制 CPU 与 Coral kernel 的 ISA 配置分开。 | S1-01,S0-02 | 可裸机执行的入口与参数绑定 | 参数、栈、完成标志和 DTCM 预留区不重叠；非法配置不启动，共享写结果对控制 CPU 可见后再发布完成标志。 |
 | S1-03 | 生成真实静态 RISC-V ELF | 首版明确调用固定 SDK 的 clang/ld.lld 编译 LLVM IR 并链接入口和脚本（保留 .text 末 256B FILL(0x13000000) 预取 NOP 填充及 0x00010100/0x6f00 DATA 布局）。记录 target、ABI、features 和未解析符号。 | S1-02 | ELF、符号/段信息及最小元数据 | ELF32/小端/RISC-V、ISA 属性、ABI、入口、NOP 预取填充和 PT_LOAD 正确；初期静态链接，未解析 helper、动态重定位或未支持指令必须诊断。 |
 | S1-04 | 建立 AOT 镜像打包 | 宿主按加载段打包，显式约定 p_vaddr/p_paddr 的使用；检查文件范围、filesz<=memsz、地址加法溢出、段权限、对齐、重叠和 BSS 零填充。 | S1-03 | 来源可追踪的启动镜像与 manifest | 损坏/截断 ELF、越界或重叠加载段、区域不匹配及入口不在合法代码区均被拒绝；保存 ELF 与加载段哈希。 |
@@ -648,9 +700,9 @@ grid=1、共享 SRAM；标准 LLVM 方言，不引入 TTS/RVV/DMA。
 
 建议代码位置：
 
-- **S1-01**：`third_party/coral/lib/TritonCoralToLLVM.cpp` 实现 conversion pass，`triton_coral.cc` 暴露 factory，`backend/compiler.py` 接入 `make_llir`。
-- **S1-02**：runtime/start.S；入口 wrapper。
-- **S1-03**：backend/compiler.py；runtime/link.ld。
+- **S1-01**：Coral 的 `include/TritonCoralToLLVM/` 定义接口，`lib/TritonCoralToLLVM/` 实现转换。由 `triton_coral.cc` 绑定，`backend/compiler.py` 接入 `make_llir`。
+- **S1-02**：`third_party/coral/backend/runtime/start.S`，链接进 kernel 的入口包装。
+- **S1-03**：`third_party/coral/backend/compiler.py` 和 `backend/runtime/link.ld`，生成静态 RV32 ELF。
 - **S1-04**：AOT 打包工具；控制固件生成器。
 - **S1-05**：控制固件；仿真执行桥。
 - **S1-06**：AOT 数值回归与报告。

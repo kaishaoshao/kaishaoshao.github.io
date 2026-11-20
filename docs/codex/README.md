@@ -7,7 +7,7 @@
 | Triton 支持 Coral | [plan.md](triton-coral/plan.md) | [plan.json](triton-coral/plan.json) | [tasks.xlsx](triton-coral/tasks.xlsx) |
 | LLVM HIP 支持 Vortex | [plan.md](llvm-hip-vortex/plan.md) | — | [tasks.md](llvm-hip-vortex/tasks.md) |
 
-Triton Coral 从已搭建的后端骨架开始。第一次跑样例请打开[教程入口](triton-coral/plan.md#第一次运行)，接着按[标量单核闭环](triton-coral/backend-skeleton.md)完成首个真实 AOT。S0–S9 各课都有代表用例、观察点和验收信号。回看 CMake、nanobind 与 Python 注册时读[骨架课](triton-coral/tutorials/01-backend-skeleton.md)。
+Triton Coral 从已搭建的后端骨架开始。先看[源码目录与职责](triton-coral/plan.md#源码目录与职责)，再从[标量单核课的第一步](triton-coral/backend-skeleton.md#第一步s0-03-正式前端选项)补齐正式选项。S0–S9 各课都有代表用例、观察点和验收信号。回看 CMake、nanobind 与 Python 注册时读[骨架课](triton-coral/tutorials/01-backend-skeleton.md)。
 
 LLVM HIP/Vortex 由 `store42` 逐步推进到普通 HIP vecadd 和已有程序移植。六个大阶段覆盖 28 个小阶段，每步说明目标、测试和实现注意点，并按完成范围回填 66 项工程任务。[教程目标与验收](llvm-hip-vortex/plan.md#stage-goals) · [完整 L01 命令](llvm-hip-vortex/getting-started.md) · [固定 HIP 输入](llvm-hip-vortex/examples/l01/) · [观察脚本](llvm-hip-vortex/examples/run_l01.py)
 

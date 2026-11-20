@@ -136,9 +136,9 @@
       "S1-01",
       "S1 AOT 闭环",
       "实现最小 TTIR 到 LLVM 转换",
-      "先把 TritonCoralToLLVM 接入 make_llir，用 triton.compile 验证空 kernel 和 RV32 LLVM IR。再在同一 pass 加 i32 load/store、常量与 addi。源级动态分支留 S4。",
+      "先构建 TritonCoralToLLVM 组件并验证 LLVM 方言，再接 make_llir 生成 RV32 LLVM IR。之后在同一组件加 i32 load/store、常量与 addi。源级动态分支留 S4。",
       "S0-03",
-      "third_party/coral/lib/TritonCoralToLLVM.cpp；triton_coral.cc；backend/compiler.py",
+      "Coral 的 include/TritonCoralToLLVM、lib/TritonCoralToLLVM、triton_coral.cc、backend/compiler.py",
       "由真实 TTIR 生成的 LLVM IR",
       "空函数 LLVM 方言 checkpoint/verifier 与标量 LLVM IR 均合法；G1 源白名单仅拷贝、常量加法和回绕。O0/O2 与无 UB 参考一致，不擅加 nsw/nuw；更多算术逐项加测试。",
       "高",
@@ -150,7 +150,7 @@
       "实现 kernel 入口包装",
       "入口按 v2 参数框架（a0=0x00010000）校验 abi/size、设置 16B 对齐栈（sp=0x00018000）、读取设备参数、调用生成函数，并在返回前执行 fence rw,rw 后向 args->done 指向地址写 1。控制 CPU 与 Coral kernel 的 ISA 配置分开。",
       "S1-01,S0-02",
-      "runtime/start.S；入口 wrapper",
+      "third_party/coral/backend/runtime/start.S",
       "可裸机执行的入口与参数绑定",
       "参数、栈、完成标志和 DTCM 预留区不重叠；非法配置不启动，共享写结果对控制 CPU 可见后再发布完成标志。",
       "中",
@@ -162,7 +162,7 @@
       "生成真实静态 RISC-V ELF",
       "首版明确调用固定 SDK 的 clang/ld.lld 编译 LLVM IR 并链接入口和脚本（保留 .text 末 256B FILL(0x13000000) 预取 NOP 填充及 0x00010100/0x6f00 DATA 布局）。记录 target、ABI、features 和未解析符号。",
       "S1-02",
-      "backend/compiler.py；runtime/link.ld",
+      "third_party/coral/backend/compiler.py；backend/runtime/link.ld",
       "ELF、符号/段信息及最小元数据",
       "ELF32/小端/RISC-V、ISA 属性、ABI、入口、NOP 预取填充和 PT_LOAD 正确；初期静态链接，未解析 helper、动态重定位或未支持指令必须诊断。",
       "中",
@@ -1262,8 +1262,8 @@
         "steps": [
           [
             "S1-01a",
-            "在 make_llir 转换函数签名、指针和空返回，导出 RV32 LLVM IR。",
-            "`S1.empty.frontend` 看 `EMPTY`。实际产物用 `EMPTYLLVM`、`EMPTYLLIR` 与 LLVM verifier。",
+            "先验证原生 pass，再在 make_llir 导出 RV32 LLVM IR。",
+            "真实 TTIR 先用 `EMPTYLLVM` 验收。接入后用 `EMPTYLLIR` 与 LLVM verifier。",
             "用 `triton.compile` 验证正式流水线。`S1.copy` 应在 `tt.load` 报未合法化。"
           ],
           [

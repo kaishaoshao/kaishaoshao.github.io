@@ -1,7 +1,7 @@
-# LLVM 23 HIP 支持 Vortex 教程：L01 与 L02 实现实战指南
+# LLVM 23 HIP 支持 Vortex 教程：L01、L02 与 L03 全流程实战指南
 
-更新日期：2026-11-19（Asia/Shanghai）。
-本文档系统总结与说明 **L01（HIP 前端探索）** 与 **L02（Vortex 编译入口与后端首批改动）** 的全部已提交实现、代码细节、底层设计原理与复现验证步骤。
+更新日期：2026-11-20（Asia/Shanghai）。
+本文档系统总结与说明 **L01（HIP 前端探索）**、**L02（Vortex 编译入口与后端首批改动）** 以及 **L03（首个 Kernel 在 SimX 模拟器上跑通并读回 42）** 的全部已提交实现、代码细节、底层设计原理、踩坑排错与复现验证步骤。
 
 ---
 
@@ -12,7 +12,9 @@
 3. [L02 实战一：注册 xvortex 扩展与 -mcpu=vortex CPU（Commit: `2cbb216a2`）](#3-l02-实战一注册-xvortex-扩展与--mcpuvortex-cpu)
 4. [L02 实战二：首条自定义指令 vx_tmc 的 MC 编解码支持（Commit: `0d3d3fcd2`）](#4-l02-实战二首条自定义指令-vx_tmc-的-mc-编解码支持)
 5. [L02 实战三：为逻辑 Kernel 打上 IR 标记并生成首个设备对象（Commit: `d558c7fd0`）](#5-l02-实战三为逻辑-kernel-打上-ir-标记并生成首个设备对象)
-6. [阶段总结与 L03（SimX 执行闭环）衔接](#6-阶段总结与-l03simx-执行闭环衔接)
+6. [L03 实战：首个单线程 Kernel store42 在 SimX 上跑通并读回 42（Commit: `ebb09fb51`）](#6-l03-实战首个单线程-kernel-store42-在-simx-上跑通并读回-42)
+7. [常见排错与踩坑指南（Troubleshooting & FAQs）](#7-常见排错与踩坑指南troubleshooting--faqs)
+8. [阶段总结与 L04（多线程 SIMT 与分支分歧）展望](#8-阶段总结与-l04多线程-simt-与分支分歧展望)
 
 ---
 
@@ -234,17 +236,228 @@ static constexpr FeatureBitset XVortexGroup = {RISCV::FeatureVendorXVortex};
 
 ---
 
-## 6. 阶段总结与 L03（SimX 执行闭环）衔接
+## 6. L03 实战：首个单线程 Kernel store42 在 SimX 上跑通并读回 42
 
-### 6.1 当前已构建的核心能力
-- [x] Clang / LLC 完整识别 `-mcpu=vortex` 与 `xvortex` 扩展；
-- [x] 成功实现第一条 Vortex 指令 `vx_tmc` 的汇编、反汇编与负例测试；
-- [x] Clang CodeGen 正确识别 `__global__` 并打上 `"vortex-hip-kernel"` 标记；
-- [x] 成功编译出首个由新编译器生成的设备端目标文件 `store42.o`。
+- **对应 Git 提交**：`ebb09fb51`
+- **对应工程计划**：[L03：执行第一个 kernel，主机读回 42](plan.md#l03执行第一个-kernel主机读回-42)（含 L03.1～L03.5 全套验收）
+- **本地实验源码**：`llvm/unittests/Vortex/L03/`
 
-### 6.2 下一步：L03 在 SimX 上跑通并读回 42
-有了 `store42.o`，L03 的目标是：
-1. 编写单参数 `kernel_wrapper.cpp`（解包 `a0` 中的输出指针并调用 `store42`）；
-2. 配合 Vortex 原生启动代码 `vx_start.S` 链接出 `kernel.elf` 并由 `vxbin.py` 打包成 `kernel.vxbin`；
-3. 编写 Host 端程序 `host_store42.cpp`（分配显存、加载模块、单线程 launch、读回数据）；
-4. **在 SimX 周期级模拟器上运行，真实读回数字 `42`，完成首个端到端执行闭环！**
+### 6.1 实验目标与全栈闭环架构
+L03 的核心任务是验证**“由新编译器生成的设备目标代码是否能在真实的硬件模拟器（SimX）上执行并正确读回显存结果”**。
+这是一个真正意义上的“源码到硬件模拟执行”端到端（End-to-End）闭环：
+```text
+[store42.hip] ──(新Clang -cc1)──> [store42.ll] ──(新LLC -mcpu=vortex)──> [store42.o]
+                                                                             │
+[kernel_wrapper.cpp] ──────────────────(新Clang++)───────────────────> [kernel_wrapper.o]
+                                                                             │
+                                              (链接: vx_start.S.2.o + link64.ld + libvortex2.a)
+                                                                             │
+                                                                             ▼
+[vxbin.py 打包] <─────────────────────────────────────────────────────── [kernel.elf]
+      │
+      ▼
+[kernel.vxbin] (内含 VXSYMTAB 符号表, 导出 "main" @ 0x180000060)
+      │
+      ▼ (Host 调用 vortex2.h 运行时 API 加载并 Launch)
+[host_store42] ──(VORTEX_DRIVER=simx)──> [SimX 模拟器执行] ──> 显存读回: 42 (SUCCESS!)
+```
+
+### 6.2 模块一：设备端编译与参数解包 Wrapper
+- **源码文件**：[store42.hip](file:///home/kaikai/vortex-word/llvm-project/llvm/unittests/Vortex/L03/store42.hip)、[kernel_wrapper.cpp](file:///home/kaikai/vortex-word/llvm-project/llvm/unittests/Vortex/L03/kernel_wrapper.cpp)
+
+#### 1. 业务 Kernel（`store42.hip`）
+```cpp
+#define __global__ __attribute__((global))
+
+__global__ void store42(int* out) {
+  *out = 42;
+}
+```
+经过新编译器两步生成目标文件：
+1. `clang -cc1 -triple riscv64-unknown-elf -target-cpu vortex -target-abi lp64d -x hip -fcuda-is-device -emit-llvm -O2 store42.hip -o /tmp/store42.ll`
+2. `llc -mtriple=riscv64 -mcpu=vortex -filetype=obj /tmp/store42.ll -o store42.o`
+
+#### 2. 参数解包桥接与符号契约（`kernel_wrapper.cpp`）
+- **为什么需要 Wrapper？**
+  用户编写的逻辑 Kernel 是多参数的（`store42(int* out)`），但在硬件层面，Vortex 启动架构（KMU + `vx_start.S`）在 `MSCRATCH` CSR 中只传递一个统一的参数包指针（通过寄存器 `a0` 传给入口）。因此需要一个单指针入口接收 `kernel_arg_t*`，解包出字段后再调用 `store42`。
+- **符号导出契约（`__vx_kentry_`）**：
+  Vortex 的打包脚本 `vxbin.py` 扫描 ELF 符号表时，只提取前缀为 `__vx_kentry_` 的符号，并将 `__vx_kentry_kernel_main` 规范化为模块公开名称 `"main"`。为了让 Host 端的 `vx_module_get_kernel(module, "main", &kernel)` 成功解析，我们在 Wrapper 中定义 alias：
+```cpp
+#include <stdint.h>
+
+struct kernel_arg_t {
+  uint64_t out_addr;
+};
+
+// 引用新编译器生成的 store42 符号(C++名称粉碎)
+extern "C" void _Z7store42Pi(int* out);
+
+// Vortex 硬件约定的单指针入口
+extern "C" __attribute__((used, retain)) void kernel_main(kernel_arg_t* arg) {
+  _Z7store42Pi(reinterpret_cast<int*>(arg->out_addr));
+}
+
+// vxbin.py 扫描 __vx_kentry_<kernel> 导出符号表，将 __vx_kentry_kernel_main 映射为 "main"
+extern "C" __attribute__((used, retain)) void __vx_kentry_kernel_main(kernel_arg_t* arg)
+    __attribute__((alias("kernel_main")));
+```
+
+### 6.3 模块二：设备固件链接与 .vxbin 打包
+- **脚本文件**：[build-00.sh](file:///home/kaikai/vortex-word/llvm-project/llvm/unittests/Vortex/L03/build-00.sh)
+
+#### 1. 链接为 RISC-V 裸机可执行 ELF
+链接步骤的关键点在于正确复用预编译的启动汇编与静态库：
+```bash
+"$REF_TOOLS/clang++" --target=riscv64-unknown-elf -march=rv64imafd -mabi=lp64d \
+    -mcmodel=medany -nostartfiles -nostdlib \
+    -Wl,-Bstatic,--gc-sections,-T,"$VORTEX_HOME/sw/kernel/scripts/link64.ld",--defsym=STARTUP_ADDR=0x180000000 \
+    "$BASELINE/sw/kernel/vx_start.S.2.o" kernel_wrapper.o store42.o \
+    -L "$BASELINE/sw/kernel" -lvortex2 \
+    -L "$TOOLS/libc64/lib" -lm -lc \
+    "$TOOLS/libcrt64/lib/baremetal/libclang_rt.builtins-riscv64.a" \
+    -o kernel.elf
+```
+- `-nostartfiles -nostdlib`：禁用默认宿主启动文件和动态库；
+- `vx_start.S.2.o`：包含 KMU 调度入口、WARP 初始化与 CSR 分发的预编译目标文件；
+- `--defsym=STARTUP_ADDR=0x180000000`：设置固件启动基地址；
+- `-lvortex2`：Vortex 设备端核心运行时库。
+
+#### 2. 打包生成 `.vxbin` 镜像
+通过 `vxbin.py` 提取 LOAD 段并生成符号表尾部（`VXSYMTAB`）：
+```bash
+OBJCOPY="$REF_TOOLS/llvm-objcopy" python3 "$VORTEX_HOME/sw/kernel/scripts/vxbin.py" kernel.elf kernel.vxbin
+```
+使用 `inspect-kernel.py` 检视打包成果：
+```json
+{
+  "format": "vxbin",
+  "memory_start": "0x180000000",
+  "memory_end": "0x180001000",
+  "kernels": [
+    {
+      "name": "main",
+      "address": "0x180000060"
+    }
+  ],
+  "payload_bytes": 4096
+}
+```
+可以看到内核 entry 成功导出为 `main`，入口 PC 为 `0x180000060`。
+
+### 6.4 模块三：Host 驱动与 SimX 模拟执行
+- **源码与执行脚本**：[host_store42.cpp](file:///home/kaikai/vortex-word/llvm-project/llvm/unittests/Vortex/L03/host_store42.cpp)、[run-sim.sh](file:///home/kaikai/vortex-word/llvm-project/llvm/unittests/Vortex/L03/run-sim.sh)
+
+Host 端基于 Vortex 官方推荐的 `vortex2.h` 异步运行时架构编写：
+1. **打开设备与创建命令队列**：
+   ```cpp
+   vx_device_h device = nullptr;
+   RT_CHECK(vx_device_open(0, &device));
+   vx_queue_h queue = nullptr;
+   vx_queue_info_t qi = { sizeof(qi), nullptr, VX_QUEUE_PRIORITY_NORMAL, 0 };
+   RT_CHECK(vx_queue_create(device, &qi, &queue));
+   ```
+2. **显存申请与内核加载**：
+   ```cpp
+   vx_buffer_h dst_buf = nullptr;
+   RT_CHECK(vx_buffer_create(device, sizeof(int), VX_MEM_WRITE, &dst_buf));
+   kernel_arg_t args = {};
+   RT_CHECK(vx_buffer_address(dst_buf, &args.out_addr));
+
+   vx_module_h module = nullptr;
+   RT_CHECK(vx_module_load_file(device, "kernel.vxbin", &module));
+   vx_kernel_h kernel = nullptr;
+   RT_CHECK(vx_module_get_kernel(module, "main", &kernel));
+   ```
+3. **配置单线程 Launch 与读回验证**：
+   ```cpp
+   vx_launch_info_t li = {};
+   li.struct_size  = sizeof(li);
+   li.kernel       = kernel;
+   li.args_host    = &args;
+   li.args_size    = sizeof(args);
+   li.ndim         = 1;
+   li.grid_dim[0]  = 1;
+   li.block_dim[0] = 1;
+
+   vx_event_h launch_ev = nullptr;
+   RT_CHECK(vx_enqueue_launch(queue, &li, 0, nullptr, &launch_ev));
+
+   int result = 0;
+   vx_event_h read_ev = nullptr;
+   RT_CHECK(vx_enqueue_read(queue, &result, dst_buf, 0, sizeof(int), 1, &launch_ev, &read_ev));
+   RT_CHECK(vx_event_wait_value(read_ev, 1, VX_TIMEOUT_INFINITE));
+
+   assert(result == 42);
+   ```
+
+### 6.5 执行验证
+执行 `bash run-sim.sh`，终端完整输出：
+```text
+=== kernel.vxbin 打包成功 ===
+{
+  "format": "vxbin",
+  "memory_start": "0x180000000",
+  "memory_end": "0x180001000",
+  "kernels": [
+    {
+      "name": "main",
+      "address": "0x180000060"
+    }
+  ],
+  "payload_bytes": 4096
+}
+=== Running host_store42 on SimX ===
+>>> [Host] Opening Vortex SimX device...
+>>> [Host] Allocating device buffer...
+>>> [Host] Device buffer address: 0x30000
+>>> [Host] Loading kernel.vxbin...
+>>> [Host] Enqueue launch on SimX...
+>>> [Host] Read back value from SimX: 42
+
+============================================
+  SUCCESS! SimX returned 42 from store42!   
+============================================
+```
+
+---
+
+## 7. 常见排错与踩坑指南（Troubleshooting & FAQs）
+
+在 L03 的开发与排查过程中，我们遇到了几个典型的硬核问题，在此沉淀为排错手册：
+
+### 7.1 `'VX_types.h' file not found` 报错
+- **现象**：链接或汇编 `vx_start.S` 时，报 `fatal error: 'VX_types.h' file not found`。
+- **根因**：`VX_types.h` 是 Vortex 在配置构建时动态生成的文件（位于 `build64/sw/VX_types.h`），并不在源码树中。且 `vx_start.S` 需要包含几十个由硬件参数派生的 `-DVX_CFG_*` 宏定义和 sysroot 下的 `<newlib.h>`。
+- **解法**：不直接从源码重新编译 `vx_start.S`，而是直接链接 Vortex 构建好的预编译目标文件 `$BASELINE/sw/kernel/vx_start.S.2.o`。
+
+### 7.2 打包后 `kernel.vxbin` 内核列表为空（`"kernels": []`）
+- **现象**：`inspect-kernel.py kernel.vxbin` 显示 `"kernels": []`，Host 端随后在 `vx_module_get_kernel` 报错找不到 `"main"`。
+- **根因**：`vxbin.py` 依靠符号名前缀识别内核入口。它只检索以 `__vx_kentry_` 开头的符号，并且将 `__vx_kentry_kernel_main` 重命名映射为公开的 `"main"`。如果 C++ 代码中只导出了普通函数名 `kernel_main`，则会被忽略。
+- **解法**：在 Wrapper 中为 `kernel_main` 添加别名：
+  `extern "C" void __vx_kentry_kernel_main(kernel_arg_t* arg) __attribute__((alias("kernel_main")));`。
+
+### 7.3 Vortex 2.0 API 适配踩坑
+- **现象**：编译 `host_store42.cpp` 报 `vx_dev_open`、`grid`、`vx_event_wait` 未声明或结构体不匹配。
+- **根因**：Vortex 2.0 进行了运行时接口重构（定义在 `vortex2.h`），全面采用异步队列模型（Command Queue）与引用计数体系。
+- **解法**：
+  - 打开/释放设备：`vx_device_open(0, &device)`，`vx_device_release(device)`；
+  - 队列/模块释放：`vx_queue_release(queue)`，`vx_module_release(module)`；
+  - Launch 描述符：使用 `ndim=1`，`grid_dim[3]` 与 `block_dim[3]` 数组；
+  - 内存读取：`vx_enqueue_read(queue, host_dst, dev_src, offset, size, n_wait, wait_events, out_event)`。
+
+---
+
+## 8. 阶段总结与 L04（多线程 SIMT 与分支分歧）展望
+
+### 8.1 阶段里程碑总结
+经过 L01、L02、L03 三个阶段的渐进式演进，Native HIP on Vortex 已经取得了阶段性重大突破：
+- **L01**：摸清了 Clang HIP 前端机制，明确了标量 IR 到硬件设备执行之间的缺口；
+- **L02**：在 RISC-V 后端成功打通了 `-mcpu=vortex`、`xvortex` 扩展、自定义 SIMT 指令 `vx_tmc`，并在 IR 上标记了逻辑 Kernel 属性；
+- **L03**：成功实现了全链路打通，首次在 SimX 周期级模拟器上运行了由新 LLVM 编译出的 HIP Kernel，并正确读回了显存数值 `42`！
+
+### 8.2 L04 下一步规划：从单线程迈向真正 SIMT
+L03 目前运行的是单线程（1 Block, 1 Thread）并且没有分歧控制。L04 的目标是**跑通具有实际计算意义的多线程 Kernel（带边界检查的 `vecadd`）**：
+1. **接入线程与块内索引 Builtins**：实现 `threadIdx.x`、`blockIdx.x`、`blockDim.x` 映射到 Vortex 特殊 CSR（如 `VX_CSR_THREAD_ID` 等）；
+2. **SIMT 分歧控制流 Lowering**：当多线程遇到 `if (gid < n)` 时，生成 Vortex 专有的分支分歧与活跃线程掩码控制逻辑（`vx_split` / `vx_join` / `vx_tmc`）；
+3. **多线程 SimX 验证**：在 SimX 上启动多个 Warp/Thread，验证并行加法及边界条件下的结果正确性。
+

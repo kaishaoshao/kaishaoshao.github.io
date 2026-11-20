@@ -4,15 +4,15 @@
 
 [打开全书目录](tutorial.md) · [开始第 1 章](chapters/01-hip-frontend/README.md) · [直接运行第一个 ELF](chapters/03-store42/00-direct-elf.md)
 
-教程基于 LLVM 23.1.4，复用 RISC-V Target，逐步加入初版 RV64 的 `-mcpu=vortex`、`xvortex`、SIMT、kernel ABI 和原生 HIP runtime。六章共 29 节小课，从观察 HIP 语法开始，最后用 SimX 验收一个已有 HIP 程序。
+教程基于 LLVM 23.1.4，复用 RISC-V Target，逐步加入初版 RV64 的 `-mcpu=vortex`、`xvortex`、SIMT、kernel ABI 和原生 HIP runtime。全书四篇共 12 章、38 节。前十章从观察 HIP 语法推进到在 SimX 上验收已有程序，第 11、12 章按需求扩展块内协作、原子和异步能力。
 
-每章首页有学习目标、准备工作和验收条件。每节有独立页面和前后导航。L01 可按命令做实验，L02～L03 有源码与运行示例，L04～L06 目前提供逐节提纲和通过标准。
+每章首页有学习目标、准备工作和验收条件。每节有独立页面和前后导航。L01 可按命令做实验，L02～L03 有源码与运行示例，第 6～12 章提供逐节提纲和通过标准。
 
 ## 查阅资料
 
 | 资料 | 用途 |
 |---|---|
-| [全书目录](tutorial.md) | 六章阅读顺序，每章下列出全部小课 |
+| [全书目录](tutorial.md) | 四篇的阅读顺序，每章下列出全部小课 |
 | [架构与指令集](architecture.md) | CPU、ISA、SIMT、指令编码与实现边界 |
 | [工程计划与证据](plan.md) | 阶段验收、后端接入时点、历史实验、目标程序 |
 | [66 项工程任务](tasks.md) | T00～T10 的验收条件、依赖与课程映射 |

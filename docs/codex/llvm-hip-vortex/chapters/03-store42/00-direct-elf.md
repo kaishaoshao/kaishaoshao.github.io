@@ -37,4 +37,4 @@ SimX → ELF e_entry → _start → store42(out) → 检查内存 → 退出码
 
 ---
 
-[上一节 · L02.5](../02-vortex-codegen/05-device-object.md) · [本章目录](README.md) · [下一节 · L03.1](01-device-buffer.md)
+[上一节 · L02.5](../02-vortex-codegen/05-device-object.md) · [本章目录](README.md) · [下一节 · 4.2](00-link-standalone.md)

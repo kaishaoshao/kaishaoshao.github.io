@@ -37,4 +37,4 @@ out=$(mktemp -d)
 
 ---
 
-[上一节 · L02.4](04-tmc-mc.md) · [本章目录](README.md) · [下一节 · L03.0](../03-store42/00-direct-elf.md)
+[上一节 · L02.4](04-tmc-mc.md) · [本章目录](chapter-03-cpu-and-tmc.md) · [下一节 · L03.0](../03-store42/00-direct-elf.md)

@@ -35,4 +35,4 @@ static constexpr FeatureBitset XVortexGroup = {RISCV::FeatureVendorXVortex};
 
 ---
 
-[上一节 · L02.3](03-cpu-and-features.md) · [本章目录](README.md) · [下一节 · L02.5](05-device-object.md)
+[上一节 · L02.3](03-cpu-and-features.md) · [本章目录](chapter-03-cpu-and-tmc.md) · [下一节 · L02.5](05-device-object.md)

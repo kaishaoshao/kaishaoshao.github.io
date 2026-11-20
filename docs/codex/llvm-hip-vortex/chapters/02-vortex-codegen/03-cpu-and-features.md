@@ -38,4 +38,4 @@ def VORTEX : RISCVProcessorModel<"vortex",
 
 ---
 
-[上一节 · L02.2](02-emit-kernel-marker.md) · [本章目录](README.md) · [下一节 · L02.4](04-tmc-mc.md)
+[上一节 · L02.2](02-emit-kernel-marker.md) · [本章目录](chapter-03-cpu-and-tmc.md) · [下一节 · L02.4](04-tmc-mc.md)

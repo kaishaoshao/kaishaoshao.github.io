@@ -28,4 +28,4 @@ SUCCESS! SimX returned 42 from store42!
 
 ---
 
-[上一节 · L03.3](03-link-and-package.md) · [本章目录](README.md) · [下一节 · L03.5](05-rebuild-and-check.md)
+[上一节 · L03.3](03-link-and-package.md) · [本章目录](chapter-05-sdk-launch.md) · [下一节 · L03.5](05-rebuild-and-check.md)

@@ -34,4 +34,4 @@ extern "C" __attribute__((used, retain)) void __vx_kentry_kernel_main(kernel_arg
 
 ---
 
-[上一节 · L03.1](01-device-buffer.md) · [本章目录](README.md) · [下一节 · L03.3](03-link-and-package.md)
+[上一节 · L03.1](01-device-buffer.md) · [本章目录](chapter-05-sdk-launch.md) · [下一节 · L03.3](03-link-and-package.md)

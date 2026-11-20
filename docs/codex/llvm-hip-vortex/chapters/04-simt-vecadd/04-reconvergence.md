@@ -10,4 +10,4 @@
 
 ---
 
-[上一节 · L04.3](03-divergence.md) · [本章目录](README.md) · [下一节 · L05.1](../05-hip-runtime/01-memory-api.md)
+[上一节 · L04.3](03-divergence.md) · [本章目录](chapter-07-divergence.md) · [下一节 · L05.1](../05-hip-runtime/01-memory-api.md)

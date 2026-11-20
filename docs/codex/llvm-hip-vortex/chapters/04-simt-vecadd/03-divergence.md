@@ -23,4 +23,4 @@ SPLIT/JOIN 管理参与不同路径的活跃 lane 与重新汇合。先用该例
 
 ---
 
-[上一节 · L04.2](02-vecadd.md) · [本章目录](README.md) · [下一节 · L04.4](04-reconvergence.md)
+[上一节 · L04.2](02-vecadd.md) · [本章目录](chapter-07-divergence.md) · [下一节 · L04.4](04-reconvergence.md)

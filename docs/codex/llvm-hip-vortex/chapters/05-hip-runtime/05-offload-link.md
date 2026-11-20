@@ -10,4 +10,4 @@
 
 ---
 
-[上一节 · L05.4](04-host-stub.md) · [本章目录](README.md) · [下一节 · L05.6](06-hip-end-to-end.md)
+[上一节 · L05.4](04-host-stub.md) · [本章目录](chapter-09-offload.md) · [下一节 · L05.6](06-hip-end-to-end.md)

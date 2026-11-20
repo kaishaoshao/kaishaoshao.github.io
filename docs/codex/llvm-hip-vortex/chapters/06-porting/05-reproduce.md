@@ -10,4 +10,4 @@
 
 ---
 
-[上一节 · L06.4](04-cpu-reference.md) · [本章目录](README.md) · [后续专题与附录](../../tutorial.md#附录与后续专题)
+[上一节 · L06.4](04-cpu-reference.md) · [本章目录](README.md) · [下一节 · 11.1](../07-shared-memory/01-local-memory-layout.md)

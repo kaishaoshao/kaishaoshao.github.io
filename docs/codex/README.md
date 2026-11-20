@@ -9,7 +9,7 @@
 
 Triton Coral 从已搭建的后端骨架开始。第一次跑样例请打开[教程入口](triton-coral/plan.md#第一次运行)，全景路线图参考[教程总览](triton-coral/tutorial.md)，接着按[标量单核闭环](triton-coral/tutorials/ch02-scalar-single-core/01-empty-kernel-pass.md)完成首个真实 AOT。S0–S9 各课都有代表用例、观察点和验收信号。回看 CMake、nanobind 与 Python 注册时读[骨架课](triton-coral/tutorials/ch01-skeleton/01-toolchain-discovery.md)。
 
-LLVM HIP/Vortex 按六章、29 节小课展开。从观察 HIP 前端起步，接通 Vortex 编译入口，让 `store42` 在 SimX 上执行，再做多线程 vecadd、自动 HIP 启动和已有程序移植。[全书目录](llvm-hip-vortex/tutorial.md) · [第 1 章实验](llvm-hip-vortex/chapters/01-hip-frontend/README.md)
+LLVM HIP/Vortex 按四篇、12 章、38 节展开。从观察 HIP 前端起步，接通 Vortex 编译入口，让 `store42` 在 SimX 上执行，再做多线程 vecadd、自动 HIP 启动和已有程序移植。[全书目录](llvm-hip-vortex/tutorial.md) · [第 1 章实验](llvm-hip-vortex/chapters/01-hip-frontend/README.md)
 
 ## 更新方式
 

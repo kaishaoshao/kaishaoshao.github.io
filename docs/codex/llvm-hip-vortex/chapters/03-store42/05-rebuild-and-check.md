@@ -8,4 +8,4 @@
 
 ---
 
-[上一节 · L03.4](04-sdk-launch.md) · [本章目录](README.md) · [下一节 · L04.1](../04-simt-vecadd/01-thread-coordinates.md)
+[上一节 · L03.4](04-sdk-launch.md) · [本章目录](chapter-05-sdk-launch.md) · [下一节 · L04.1](../04-simt-vecadd/01-thread-coordinates.md)

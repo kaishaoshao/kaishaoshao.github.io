@@ -39,40 +39,63 @@ def anchors(path):
     return result
 
 
-def check_book():
-    cover = (ROOT / "tutorial.md").read_text(encoding="utf-8")
-    contents = cover.split("## 全书目录", 1)[1].split("## 序章", 1)[0]
-    chapter_dirs = sorted(path for path in CHAPTERS.iterdir() if path.is_dir())
-    chapter_sizes = (3, 5, 6, 4, 6, 5)
-    require(len(chapter_dirs) == len(chapter_sizes), "expected six chapter directories")
-    expected_contents = []
-    lessons = []
-    for chapter_no, (directory, size) in enumerate(zip(chapter_dirs, chapter_sizes), 1):
-        index = directory / "README.md"
-        pages = sorted(path for path in directory.glob("*.md") if path != index)
-        require(len(pages) == size, f"unexpected lesson count: {directory.name}")
-        index_text = index.read_text(encoding="utf-8")
-        chapter_links = re.findall(r"^- \[L\d{2}\.\d+ [^\]]+\]\(([^)]+)\)$", index_text, re.M)
-        require(chapter_links == [path.name for path in pages], f"chapter links out of order: {index}")
-        expected_contents.extend(path.relative_to(ROOT).as_posix() for path in [index, *pages])
-        first_step = 0 if chapter_no == 3 else 1
-        for step, path in enumerate(pages, first_step):
-            lesson_id = f"L{chapter_no:02}.{step}"
-            heading = path.read_text(encoding="utf-8").splitlines()[0]
-            require(heading.startswith(f"# {lesson_id} "), f"lesson heading mismatch: {path}")
-            lessons.append((lesson_id, path))
+def footer_targets(path):
+    footer = path.read_text(encoding="utf-8").strip().splitlines()[-1]
+    links = re.findall(r"\]\(([^)]+)\)", footer)
+    return [(path.parent / link.split("#", 1)[0]).resolve() for link in links]
 
-    cover_links = re.findall(r"\]\((chapters/[^)]+\.md)\)", contents)
-    require(cover_links == expected_contents, "book table of contents out of order")
-    for position, (lesson_id, path) in enumerate(lessons):
-        footer = path.read_text(encoding="utf-8").strip().splitlines()[-1]
-        links = re.findall(r"\]\(([^)]+)\)", footer)
-        expected_prev = lessons[position - 1][1] if position else ROOT / "tutorial.md"
-        expected_next = lessons[position + 1][1] if position + 1 < len(lessons) else ROOT / "tutorial.md"
-        destinations = [(path.parent / link.split("#", 1)[0]).resolve() for link in links]
-        require(destinations == [expected_prev, path.parent / "README.md", expected_next],
-                f"incorrect reading navigation: {lesson_id}")
-    return chapter_dirs, lessons
+
+def check_book():
+    cover = ROOT / "tutorial.md"
+    contents = cover.read_text(encoding="utf-8").split("## 全书目录", 1)[1].split("## 序章", 1)[0]
+    chapter_links = re.findall(r"^### \[(第 (\d+) 章 [^\]]+)\]\((chapters/[^)]+\.md)\)", contents, re.M)
+    require(chapter_links, "no chapter links in the book table of contents")
+    chapters = []
+    lessons = []
+    all_pages = []
+    lesson_ids = []
+    for position, (title, chapter_no, target) in enumerate(chapter_links, 1):
+        require(int(chapter_no) == position, f"chapter number out of order: {title}")
+        index = ROOT / target
+        index_text = index.read_text(encoding="utf-8")
+        require(index_text.startswith(f"# {title}\n"), f"chapter title mismatch: {index}")
+        chapter_contents = index_text.split("## 本章目录\n", 1)[1].split("\n## ", 1)[0]
+        lesson_links = re.findall(r"^- \[([^\]]+)\]\(([^)]+)\)$", chapter_contents, re.M)
+        require(lesson_links, f"no lessons in the chapter table of contents: {index}")
+        chapters.append(index)
+        all_pages.append(index)
+        for label, relative in lesson_links:
+            page = (index.parent / relative).resolve()
+            require(page.read_text(encoding="utf-8").startswith(f"# {label}\n"),
+                    f"lesson title mismatch: {page}")
+            lessons.append((page, index))
+            all_pages.append(page)
+            identifier = re.match(r"(L\d{2}\.\d+) ", label)
+            if identifier:
+                lesson_ids.append(identifier[1])
+
+    cover_links = [(ROOT / path) for path in re.findall(r"\]\((chapters/[^)]+\.md)\)", contents)]
+    require(cover_links == all_pages, "book table of contents out of order")
+    require(len(all_pages) == len(set(all_pages)) and set(all_pages) == set(CHAPTERS.rglob("*.md")),
+            "all chapter and lesson files must appear once in the book")
+    expected_ids = [f"L{stage:02}.{step}"
+                    for stage, final_step in enumerate((3, 5, 5, 4, 6, 5), 1)
+                    for step in range(0 if stage == 3 else 1, final_step + 1)]
+    require(len(lesson_ids) == len(set(lesson_ids)), "duplicate lesson ID")
+    require([key for key in lesson_ids if key in expected_ids] == expected_ids,
+            "existing lesson IDs must keep their order")
+
+    for position, index in enumerate(chapters):
+        following = chapters[position + 1] if position + 1 < len(chapters) else cover
+        previous = chapters[position - 1:position] if position else []
+        require(footer_targets(index) == [*previous, cover, following],
+                f"incorrect chapter navigation: {index}")
+    for position, (page, index) in enumerate(lessons):
+        previous = lessons[position - 1][0] if position else cover
+        following = lessons[position + 1][0] if position + 1 < len(lessons) else cover
+        require(footer_targets(page) == [previous, index, following],
+                f"incorrect lesson navigation: {page}")
+    return chapters, lessons
 
 
 def main():
@@ -102,8 +125,8 @@ def main():
 
     chapters, lessons = check_book()
     plan = (ROOT / "plan.md").read_text(encoding="utf-8")
-    chapter_ids = re.findall(r"^### (L\d{2})：", plan, re.M)
-    require(chapter_ids == [f"L{i:02}" for i in range(1, 7)], "expected six ordered chapters in plan")
+    milestones = re.findall(r"^### (L\d{2})：", plan, re.M)
+    require(milestones == [f"L{i:02}" for i in range(1, 7)], "expected six ordered milestones in plan")
     dependency_text = tasks.split('<a id="task-dependencies"></a>', 1)[1].split("## 源码导航", 1)[0]
     dependencies = {}
     for group, needs in re.findall(r"^\| (T\d{2}) \| ([^|]+) \|", dependency_text, re.M):
@@ -123,7 +146,7 @@ def main():
     for group in dependencies:
         visit(group, set())
 
-    l01 = chapters[0]
+    l01 = chapters[0].parent
     l01_text = "\n".join(path.read_text(encoding="utf-8") for path in sorted(l01.glob("*.md")))
     displayed = [body for language, body in code_blocks(l01_text) if language == "cpp"]
     fixture = (ROOT / "examples/l01/attributes.hip").read_text(encoding="utf-8").strip()

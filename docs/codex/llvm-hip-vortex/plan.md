@@ -4,7 +4,7 @@
 
 本教程采用 **6 个阶段的最小实现主线**：`store42 → vecadd → 一个已有 HIP 程序`。先观察 Clang 的语法/AST/Sema/IR，再按程序需要修改后端、ABI 和 runtime；第 3 阶段就执行设备代码，第 5 阶段接通普通 HIP 启动，第 6 阶段移植已有程序。第一个可用版本不以所有高级能力完成为前提。
 
-原有 **11 个工程能力分组、66 项任务**（T00.1～T10.6）保留为 [验收账本](tasks.md)，不作为授课顺序或运行第一个程序的全部前置。课程号 L01～L06 只组织教学，每阶段拆成多个小实验和提交；减少阶段数不表示减少必需的实现工作。原课程号的对应关系见第 0.4 节，已有 ID、进度和证据不重置。技术结构仍采用 RISC-V 内的 mcpu=vortex，详见 [架构方案](architecture.md)。
+原有 **11 个工程能力分组、66 项任务**（T00.1～T10.6）保留为 [验收账本](tasks.md)，不作为授课顺序或运行第一个程序的全部前置。L01～L06 用于核对工程里程碑。每个阶段关联一章或多章，实验记录继续使用原有编号。原课程号的对应关系见第 0.4 节，已有 ID、进度和证据不重置。技术结构仍采用 RISC-V 内的 mcpu=vortex，详见 [架构方案](architecture.md)。
 
 维护位置固定为本仓库 `docs/codex/llvm-hip-vortex/`，入口见 [README](README.md)。后续直接更新现有文件，通过 Git 记录版本，不另建日期/版本副本。
 
@@ -14,7 +14,7 @@
 
 ### 0.1 怎样做一个小阶段
 
-从[全书目录](tutorial.md)选择一章，再打开要练习的小节。每节先用一两句话说明要达成的目标，随后给出操作、测试与通过标准、实现注意点。完成后保存本次命令和产物，按阶段出口决定下一步。[证据模板](evidence-template.md)
+第 1～10 章覆盖六个工程里程碑，第 11～12 章提供 T09/T10 的进阶练习。从[全书目录](tutorial.md)选择一章，再打开要练习的小节。每节先用一两句话说明要达成的目标，随后给出操作、测试与通过标准、实现注意点。完成后保存本次命令和产物，按阶段出口决定下一步。[证据模板](evidence-template.md)
 
 L01 提供可运行的前端观察。L02～L03 提供源码示例、可复跑的本机实验和验收练习。L04～L06 提供实现提纲。实际通过记录集中在 [0.3 节](#03-已核对的教学实验与证据边界)。
 
@@ -39,7 +39,7 @@ LLVM 源码回归按被测行为选择 Clang CodeGen/Driver、LLVM MC/CodeGen �
 
 ### L01：看懂 HIP 前端
 
-[进入第 1 章](chapters/01-hip-frontend/README.md)
+[第 1 章 读懂 HIP 前端](chapters/01-hip-frontend/README.md)
 
 - <a id="l01-1"></a>[L01.1 宏展开与属性 AST](chapters/01-hip-frontend/01-attributes.md)
 - <a id="l01-2"></a>[L01.2 调用侧限制与启动表达式](chapters/01-hip-frontend/02-sema-launch.md)
@@ -49,7 +49,7 @@ LLVM 源码回归按被测行为选择 Clang CodeGen/Driver、LLVM MC/CodeGen �
 
 ### L02：建立 Vortex 编译入口，开始修改后端
 
-[进入第 2 章](chapters/02-vortex-codegen/README.md)
+[第 2 章 让 Clang 保留 kernel 身份](chapters/02-vortex-codegen/README.md) · [第 3 章 配置 Vortex CPU 并定义 TMC](chapters/02-vortex-codegen/chapter-03-cpu-and-tmc.md)
 
 - <a id="l02-1"></a>[L02.1 设计逻辑 kernel 标记](chapters/02-vortex-codegen/01-kernel-marker-design.md)
 - <a id="l02-2"></a>[L02.2 发射并核对标记](chapters/02-vortex-codegen/02-emit-kernel-marker.md)
@@ -61,7 +61,7 @@ LLVM 源码回归按被测行为选择 Clang CodeGen/Driver、LLVM MC/CodeGen �
 
 ### L03：执行第一个 kernel，主机读回 42
 
-[进入第 3 章](chapters/03-store42/README.md)
+[第 4 章 链接并直接运行设备 ELF](chapters/03-store42/README.md) · [第 5 章 通过 SDK 传参与启动 kernel](chapters/03-store42/chapter-05-sdk-launch.md)
 
 - <a id="l03-0"></a>[L03.0 直接用 SimX 运行 ELF](chapters/03-store42/00-direct-elf.md)
 - <a id="l03-1"></a>[L03.1 验证输出 buffer 和设备地址](chapters/03-store42/01-device-buffer.md)
@@ -74,7 +74,7 @@ LLVM 源码回归按被测行为选择 Clang CodeGen/Driver、LLVM MC/CodeGen �
 
 ### L04：扩成多线程 vecadd，并正确处理边界
 
-[进入第 4 章](chapters/04-simt-vecadd/README.md)
+[第 6 章 线程坐标与整块 vecadd](chapters/04-simt-vecadd/README.md) · [第 7 章 尾部判断、分歧与汇合](chapters/04-simt-vecadd/chapter-07-divergence.md)
 
 - <a id="l04-1"></a>[L04.1 读取 CTA 坐标并写回索引](chapters/04-simt-vecadd/01-thread-coordinates.md)
 - <a id="l04-2"></a>[L04.2 做无尾部判断的 vecadd](chapters/04-simt-vecadd/02-vecadd.md)
@@ -85,7 +85,7 @@ LLVM 源码回归按被测行为选择 Clang CodeGen/Driver、LLVM MC/CodeGen �
 
 ### L05：接通普通 HIP 编译和启动流程
 
-[进入第 5 章](chapters/05-hip-runtime/README.md)
+[第 8 章 实现 HIP runtime 的基本接口](chapters/05-hip-runtime/README.md) · [第 9 章 自动编译并启动普通 HIP](chapters/05-hip-runtime/chapter-09-offload.md)
 
 - <a id="l05-1"></a>[L05.1 验证最小内存 API](chapters/05-hip-runtime/01-memory-api.md)
 - <a id="l05-2"></a>[L05.2 验证显式模块启动和资源持有](chapters/05-hip-runtime/02-module-launch.md)
@@ -98,7 +98,7 @@ LLVM 源码回归按被测行为选择 Clang CodeGen/Driver、LLVM MC/CodeGen �
 
 ### L06：移植一个已有 HIP 程序，按实际缺口完善
 
-[进入第 6 章](chapters/06-porting/README.md)
+[第 10 章 移植一个已有 HIP 程序](chapters/06-porting/README.md)
 
 - <a id="l06-1"></a>[L06.1 盘点已有源码依赖](chapters/06-porting/01-inventory.md)
 - <a id="l06-2"></a>[L06.2 尝试用原生链路编译](chapters/06-porting/02-first-build.md)
@@ -417,6 +417,8 @@ int main() {
 完成后，你拥有的是一套可教学、可调试、可扩展的原生 HIP/Vortex 编译系统原型。真实硬件速度、完整 HIP 兼容或大型应用可用性，需要独立验证，不能由 SimX 样例通过直接推出。
 
 ### 6.4 首个移植结果之后的专题
+
+按程序需要选择进阶课。[第 11 章 共享内存与块内同步](chapters/07-shared-memory/README.md) · [第 12 章 原子、异步执行与交付](chapters/08-atomics-and-async/README.md)
 
 66 项账本内尚未完成的 T09/T10 可继续按需求推进；它们不因第一轮六阶段结束而删除或标为通过。以下专题不计入现有 66 项的完整能力承诺，可按实际需求继续拆解：设备数学库与更多类型；复杂 C++/按值结构体 ABI；跨翻译单元 device linking；常量/全局对象；warp/subgroup 操作；RV32；真实硬件部署；性能优化与更大型 HIP 应用移植。首个小程序的移植已在 L06 开始，不再推迟到这些专题之后。每个专题都应先定义支持子集，再增加源码、负例和执行测试。
 

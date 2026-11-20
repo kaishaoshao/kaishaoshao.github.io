@@ -12,7 +12,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| [tutorial.md](tutorial.md) | 教程总览、定位作用、六阶段演进路线与文档查阅指南 |
+| [tutorial.md](tutorial.md) | 《LLVM 后端实战：从零构建 Vortex GPGPU 的 Native HIP 编译器》主教程（大课带小课书籍结构） |
 | [architecture.md](architecture.md) | 架构、CPU/ISA/ABI 职责、选项组合、指令集、实现边界与冻结点 |
 | [plan.md](plan.md) | 六个大阶段与 28 个小阶段，含各步目标、测试、实现注意点和源码入口 |
 | [tasks.md](tasks.md) | 保留的 66 项工程验收任务及课程映射，不作为入门阅读顺序 |
